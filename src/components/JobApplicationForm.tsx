@@ -7,6 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+
+type ApplicationInsert = Database['public']['Tables']['applications']['Insert'];
 
 interface JobApplicationFormProps {
   job: any;
@@ -87,11 +90,11 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
         console.log('Upload do currículo concluído:', resumeUrl);
       }
 
-      // Preparar dados para inserção
-      const skillsArray = formData.skills ? formData.skills.split(',').map(s => s.trim()) : [];
+      // Preparar dados para inserção com tipos corretos
+      const skillsArray = formData.skills ? formData.skills.split(',').map(s => s.trim()) : null;
       const experienceYears = formData.experience_years ? parseInt(formData.experience_years) : null;
 
-      const applicationData = {
+      const applicationData: ApplicationInsert = {
         job_id: job.id,
         name: formData.name,
         email: formData.email,
@@ -100,10 +103,10 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
         experience_years: experienceYears,
         current_position: formData.current_position || null,
         education: formData.education || null,
-        skills: skillsArray.length > 0 ? skillsArray : null,
+        skills: skillsArray,
         cover_letter: formData.cover_letter || null,
         resume_url: resumeUrl,
-        status: 'Novo'
+        status: 'Novo' as const
       };
 
       console.log('Dados da candidatura:', applicationData);

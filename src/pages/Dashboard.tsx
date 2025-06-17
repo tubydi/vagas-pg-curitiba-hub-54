@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -215,7 +214,7 @@ const Dashboard = () => {
                 <Building2 className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent">
+                <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent">
                   Dashboard - {company?.name || 'Empresa'}
                 </h1>
                 <p className="text-sm text-gray-600">
@@ -231,9 +230,10 @@ const Dashboard = () => {
                 variant="outline"
                 onClick={handleSignOut}
                 className="rounded-full"
+                size="sm"
               >
                 <LogOut className="w-4 h-4 mr-2" />
-                Sair
+                <span className="hidden md:inline">Sair</span>
               </Button>
             </div>
           </div>
@@ -242,26 +242,29 @@ const Dashboard = () => {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-          <TabsList className="grid w-full grid-cols-5 bg-white/50 backdrop-blur-md rounded-2xl p-2">
-            <TabsTrigger value="overview" className="rounded-xl">
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Visão Geral
+          <TabsList className="grid w-full grid-cols-5 bg-white/50 backdrop-blur-md rounded-2xl p-2 overflow-x-auto">
+            <TabsTrigger value="overview" className="rounded-xl text-xs md:text-sm">
+              <BarChart3 className="w-4 h-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Visão Geral</span>
+              <span className="sm:hidden">Geral</span>
             </TabsTrigger>
-            <TabsTrigger value="jobs" className="rounded-xl">
-              <Briefcase className="w-4 h-4 mr-2" />
+            <TabsTrigger value="jobs" className="rounded-xl text-xs md:text-sm">
+              <Briefcase className="w-4 h-4 mr-1 md:mr-2" />
               Vagas
             </TabsTrigger>
-            <TabsTrigger value="candidates" className="rounded-xl">
-              <Users className="w-4 h-4 mr-2" />
-              Candidatos
+            <TabsTrigger value="candidates" className="rounded-xl text-xs md:text-sm">
+              <Users className="w-4 h-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Candidatos</span>
+              <span className="sm:hidden">Cand.</span>
             </TabsTrigger>
-            <TabsTrigger value="profile" className="rounded-xl">
-              <User className="w-4 h-4 mr-2" />
+            <TabsTrigger value="profile" className="rounded-xl text-xs md:text-sm">
+              <User className="w-4 h-4 mr-1 md:mr-2" />
               Perfil
             </TabsTrigger>
-            <TabsTrigger value="settings" className="rounded-xl">
-              <Settings className="w-4 h-4 mr-2" />
-              Configurações
+            <TabsTrigger value="settings" className="rounded-xl text-xs md:text-sm">
+              <Settings className="w-4 h-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Config.</span>
+              <span className="sm:hidden">Conf</span>
             </TabsTrigger>
           </TabsList>
 
@@ -270,11 +273,11 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="jobs" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-3xl font-bold">Minhas Vagas</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h2 className="text-2xl md:text-3xl font-bold">Minhas Vagas</h2>
               <Button
                 onClick={() => setShowJobForm(true)}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-2xl"
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-2xl w-full sm:w-auto"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Nova Vaga
@@ -298,15 +301,15 @@ const Dashboard = () => {
             <div className="grid gap-6">
               {jobs.length === 0 ? (
                 <Card className="border-0 rounded-3xl shadow-lg">
-                  <CardContent className="p-12 text-center">
-                    <Briefcase className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-2xl font-bold text-gray-700 mb-2">Nenhuma vaga cadastrada</h3>
+                  <CardContent className="p-8 md:p-12 text-center">
+                    <Briefcase className="h-12 md:h-16 w-12 md:w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl md:text-2xl font-bold text-gray-700 mb-2">Nenhuma vaga cadastrada</h3>
                     <p className="text-gray-500 mb-6">
                       Comece criando sua primeira vaga para atrair candidatos.
                     </p>
                     <Button
                       onClick={() => setShowJobForm(true)}
-                      className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-2xl"
+                      className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-2xl w-full sm:w-auto"
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Criar Primeira Vaga
@@ -317,12 +320,12 @@ const Dashboard = () => {
                 jobs.map((job) => (
                   <Card key={job.id} className="border-0 rounded-3xl shadow-lg hover:shadow-xl transition-shadow">
                     <CardHeader className="bg-gradient-to-r from-gray-50 to-green-50 rounded-t-3xl">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-xl font-bold text-gray-900">
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg md:text-xl font-bold text-gray-900">
                             {job.title}
                           </CardTitle>
-                          <CardDescription className="text-green-600 font-medium">
+                          <CardDescription className="text-green-600 font-medium text-sm md:text-base">
                             {job.location} • {job.contract_type} • {job.work_mode}
                           </CardDescription>
                         </div>
@@ -334,19 +337,19 @@ const Dashboard = () => {
                       </div>
                     </CardHeader>
                     
-                    <CardContent className="p-6">
-                      <p className="text-gray-600 mb-4 line-clamp-2">{job.description}</p>
+                    <CardContent className="p-4 md:p-6">
+                      <p className="text-gray-600 mb-4 line-clamp-2 text-sm md:text-base">{job.description}</p>
                       
-                      <div className="flex justify-between items-center">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div className="text-lg font-bold text-green-600">
                           {job.salary}
                         </div>
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-2 w-full sm:w-auto">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleEditJob(job)}
-                            className="rounded-xl"
+                            className="rounded-xl flex-1 sm:flex-none"
                           >
                             <Edit className="w-4 h-4 mr-1" />
                             Editar
@@ -355,7 +358,7 @@ const Dashboard = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => handleDeleteJob(job.id)}
-                            className="rounded-xl text-red-600 hover:text-red-700"
+                            className="rounded-xl text-red-600 hover:text-red-700 flex-1 sm:flex-none"
                           >
                             <Trash2 className="w-4 h-4 mr-1" />
                             Excluir
@@ -380,19 +383,19 @@ const Dashboard = () => {
           <TabsContent value="settings" className="space-y-6">
             <Card className="border-0 rounded-3xl shadow-2xl">
               <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-3xl">
-                <CardTitle className="text-2xl font-bold flex items-center">
-                  <Settings className="h-8 w-8 mr-3" />
+                <CardTitle className="text-xl md:text-2xl font-bold flex items-center">
+                  <Settings className="h-6 md:h-8 w-6 md:w-8 mr-3" />
                   Configurações da Conta
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-8">
+              <CardContent className="p-6 md:p-8">
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold mb-4">Informações da Conta</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
                         <label className="text-sm font-medium text-gray-600">Email</label>
-                        <div className="mt-1 p-3 bg-gray-50 rounded-xl">
+                        <div className="mt-1 p-3 bg-gray-50 rounded-xl text-sm md:text-base">
                           {user?.email}
                         </div>
                       </div>

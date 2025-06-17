@@ -107,6 +107,7 @@ const JobList = () => {
       job.companies.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.description.toLowerCase().includes(searchTerm.toLowerCase());
     
+    // Fix: Melhor lógica de filtro por cidade
     const matchesCity = selectedCity === "all" || 
       job.location.toLowerCase().includes(selectedCity.toLowerCase()) ||
       job.companies.city.toLowerCase().includes(selectedCity.toLowerCase());
@@ -114,12 +115,20 @@ const JobList = () => {
     const matchesContract = selectedContract === "all" || 
       job.contract_type === selectedContract;
 
+    console.log('Filter debug:', {
+      jobLocation: job.location,
+      companiesCity: job.companies.city,
+      selectedCity,
+      matchesCity,
+      jobTitle: job.title
+    });
+
     return matchesSearch && matchesCity && matchesContract;
   });
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50 p-4 md:p-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
@@ -131,23 +140,23 @@ const JobList = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent mb-4">
+          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent mb-4">
             Todas as Vagas
           </h1>
-          <p className="text-xl text-gray-600">
+          <p className="text-lg md:text-xl text-gray-600">
             Encontre sua oportunidade ideal em Ponta Grossa e região
           </p>
         </div>
 
         {/* Filters */}
         <Card className="mb-8 border-0 shadow-lg rounded-3xl">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative">
+              <div className="relative md:col-span-2">
                 <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                 <Input
                   placeholder="Buscar vagas..."
@@ -167,6 +176,8 @@ const JobList = () => {
                   <SelectItem value="curitiba">Curitiba</SelectItem>
                   <SelectItem value="castro">Castro</SelectItem>
                   <SelectItem value="carambeí">Carambeí</SelectItem>
+                  <SelectItem value="tibagi">Tibagi</SelectItem>
+                  <SelectItem value="palmeira">Palmeira</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -180,21 +191,24 @@ const JobList = () => {
                   <SelectItem value="PJ">PJ</SelectItem>
                   <SelectItem value="Freelancer">Freelancer</SelectItem>
                   <SelectItem value="Estágio">Estágio</SelectItem>
+                  <SelectItem value="Temporário">Temporário</SelectItem>
                 </SelectContent>
               </Select>
-
+            </div>
+            
+            <div className="mt-4 flex justify-center">
               <Button 
                 onClick={fetchJobs}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl"
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl w-full md:w-auto"
               >
-                Atualizar
+                Atualizar Vagas
               </Button>
             </div>
           </CardContent>
         </Card>
 
         {/* Results */}
-        <div className="mb-6">
+        <div className="mb-6 text-center md:text-left">
           <p className="text-gray-600">
             {filteredJobs.length} vaga{filteredJobs.length !== 1 ? 's' : ''} encontrada{filteredJobs.length !== 1 ? 's' : ''}
           </p>
@@ -203,9 +217,9 @@ const JobList = () => {
         {/* Jobs Grid */}
         {filteredJobs.length === 0 ? (
           <Card className="border-0 shadow-lg rounded-3xl">
-            <CardContent className="p-12 text-center">
-              <Building2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-gray-700 mb-2">Nenhuma vaga encontrada</h3>
+            <CardContent className="p-8 md:p-12 text-center">
+              <Building2 className="h-12 md:h-16 w-12 md:w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl md:text-2xl font-bold text-gray-700 mb-2">Nenhuma vaga encontrada</h3>
               <p className="text-gray-500">
                 Tente ajustar os filtros de busca ou volte mais tarde para novas oportunidades.
               </p>
@@ -218,14 +232,14 @@ const JobList = () => {
                 <CardHeader className="bg-gradient-to-br from-gray-50 to-green-50 pb-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <CardTitle className="text-xl font-bold text-gray-900 group-hover:text-green-600 transition-colors line-clamp-2">
+                      <CardTitle className="text-lg md:text-xl font-bold text-gray-900 group-hover:text-green-600 transition-colors line-clamp-2">
                         {job.title}
                       </CardTitle>
-                      <CardDescription className="text-green-600 font-semibold text-lg mt-1">
+                      <CardDescription className="text-green-600 font-semibold text-base md:text-lg mt-1">
                         {job.companies.name}
                       </CardDescription>
                     </div>
-                    <Badge variant="outline" className="rounded-full shrink-0">
+                    <Badge variant="outline" className="rounded-full shrink-0 text-xs">
                       {job.experience_level}
                     </Badge>
                   </div>
@@ -236,40 +250,40 @@ const JobList = () => {
                   </div>
                 </CardHeader>
                 
-                <CardContent className="p-6">
-                  <p className="text-gray-600 mb-6 line-clamp-3">{job.description}</p>
+                <CardContent className="p-4 md:p-6">
+                  <p className="text-gray-600 mb-6 line-clamp-3 text-sm md:text-base">{job.description}</p>
                   
                   <div className="space-y-4">
                     <div className="flex items-center justify-between text-gray-700">
-                      <div className="flex items-center">
-                        <MapPin className="w-5 h-5 mr-2 text-green-500" />
-                        <span className="font-medium">{job.location}</span>
+                      <div className="flex items-center min-w-0 flex-1">
+                        <MapPin className="w-5 h-5 mr-2 text-green-500 shrink-0" />
+                        <span className="font-medium text-sm md:text-base truncate">{job.location}</span>
                       </div>
-                      <Badge variant="outline" className="rounded-full">
+                      <Badge variant="outline" className="rounded-full ml-2 text-xs">
                         {job.work_mode}
                       </Badge>
                     </div>
                     
                     <div className="flex items-center justify-between text-gray-700">
-                      <div className="flex items-center">
-                        <DollarSign className="w-5 h-5 mr-2 text-green-500" />
-                        <span className="font-bold text-lg text-green-600">{job.salary}</span>
+                      <div className="flex items-center min-w-0 flex-1">
+                        <DollarSign className="w-5 h-5 mr-2 text-green-500 shrink-0" />
+                        <span className="font-bold text-base md:text-lg text-green-600 truncate">{job.salary}</span>
                       </div>
-                      <Badge variant="outline" className="rounded-full">
+                      <Badge variant="outline" className="rounded-full ml-2 text-xs">
                         {job.contract_type}
                       </Badge>
                     </div>
 
                     {job.benefits && job.benefits.length > 0 && (
                       <div className="flex flex-wrap gap-2">
-                        {job.benefits.slice(0, 3).map((benefit, index) => (
+                        {job.benefits.slice(0, 2).map((benefit, index) => (
                           <Badge key={index} variant="secondary" className="text-xs">
                             {benefit}
                           </Badge>
                         ))}
-                        {job.benefits.length > 3 && (
+                        {job.benefits.length > 2 && (
                           <Badge variant="secondary" className="text-xs">
-                            +{job.benefits.length - 3} benefícios
+                            +{job.benefits.length - 2} benefícios
                           </Badge>
                         )}
                       </div>
@@ -278,7 +292,7 @@ const JobList = () => {
                   
                   <Button 
                     onClick={() => handleApplyJob(job)}
-                    className="w-full mt-6 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+                    className="w-full mt-6 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-semibold text-base md:text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
                   >
                     Candidatar-se Agora
                   </Button>

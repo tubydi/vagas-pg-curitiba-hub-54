@@ -20,7 +20,7 @@ interface JobApplicationFormProps {
   companyName: string;
 }
 
-type ApplicationStatus = Database["public"]["Enums"]["application_status"];
+type ApplicationInsert = Database["public"]["Tables"]["applications"]["Insert"];
 
 const JobApplicationForm = ({ isOpen, onClose, jobId, jobTitle, companyName }: JobApplicationFormProps) => {
   const { toast } = useToast();
@@ -136,7 +136,7 @@ const JobApplicationForm = ({ isOpen, onClose, jobId, jobTitle, companyName }: J
       }
 
       // Preparar dados da candidatura com tipos corretos
-      const applicationData = {
+      const applicationData: ApplicationInsert = {
         job_id: jobId,
         name: formData.name,
         email: formData.email,
@@ -148,7 +148,7 @@ const JobApplicationForm = ({ isOpen, onClose, jobId, jobTitle, companyName }: J
         skills: skills.length > 0 ? skills : null,
         cover_letter: formData.cover_letter || null,
         resume_url: resumeUrl,
-        status: 'Novo' as ApplicationStatus
+        status: "Novo"
       };
 
       console.log('Dados da candidatura:', applicationData);

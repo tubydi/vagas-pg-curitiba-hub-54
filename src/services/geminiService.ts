@@ -105,4 +105,23 @@ Formate como uma lista numerada.
     
     return this.generateContent(prompt);
   }
+
+  static async searchLatestJobs(): Promise<string> {
+    const prompt = `
+Busque e liste as vagas de emprego mais recentes (últimas 24 horas) para Ponta Grossa e Curitiba do LinkedIn e Google Jobs.
+
+Formate a resposta como uma lista com:
+- Título da vaga
+- Empresa
+- Localização (Ponta Grossa ou Curitiba)
+- Tipo de contrato
+- Link (se disponível)
+- Data de publicação
+
+Foque em vagas relevantes para o mercado local dessas cidades.
+Limite a 10 vagas mais relevantes e recentes.
+`;
+    
+    return this.generateContent(prompt);
+  }
 }

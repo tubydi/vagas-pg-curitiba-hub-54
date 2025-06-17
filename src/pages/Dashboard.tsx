@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,15 +17,17 @@ import {
   Trash2,
   User,
   LogOut,
-  Shield
+  Shield,
+  Sparkles
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import JobForm from "@/components/JobForm";
+import EnhancedJobForm from "@/components/EnhancedJobForm";
 import CompanyProfileEdit from "@/components/CompanyProfileEdit";
 import AdminStats from "@/components/AdminStats";
 import AdminCompanies from "@/components/AdminCompanies";
 import AdminApplications from "@/components/AdminApplications";
+import { GeminiService } from "@/services/geminiService";
 
 interface Company {
   id: string;
@@ -69,6 +72,8 @@ const Dashboard = () => {
   const [showJobForm, setShowJobForm] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [latestJobs, setLatestJobs] = useState<string>("");
+  const [loadingLatestJobs, setLoadingLatestJobs] = useState(false);
 
   console.log('🏠 Dashboard - user:', user?.email, 'isAdmin:', isAdmin);
 
@@ -76,7 +81,6 @@ const Dashboard = () => {
     if (user) {
       console.log('👤 Usuário no dashboard:', user.email, 'É ADMIN?', isAdmin);
       
-      // Se for admin, não buscar dados de empresa
       if (isAdmin) {
         console.log('🔑 USUÁRIO É ADMIN - NÃO BUSCANDO DADOS DE EMPRESA');
         setLoading(false);
@@ -153,6 +157,26 @@ const Dashboard = () => {
     }
   };
 
+  const fetchLatestJobsFromAI = async () => {
+    setLoadingLatestJobs(true);
+    try {
+      const result = await GeminiService.searchLatestJobs();
+      setLatestJobs(result);
+      toast({
+        title: "🔍 Busca concluída!",
+        description: "VPG IA encontrou as vagas mais recentes do LinkedIn e Google.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao buscar vagas. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingLatestJobs(false);
+    }
+  };
+
   const handleJobSaved = () => {
     setShowJobForm(false);
     setEditingJob(null);
@@ -203,38 +227,37 @@ const Dashboard = () => {
     }
   };
 
-  // VERIFICAÇÃO CRÍTICA: Se for admin, mostrar painel administrativo
   console.log('🔍 VERIFICAÇÃO FINAL - isAdmin:', isAdmin, 'user email:', user?.email);
   
   if (isAdmin) {
-    console.log('🔥🔥🔥 RENDERIZANDO PAINEL ADMIN - USUÁRIO É ADMIN!');
+    console.log('🔥🔥🔥 RENDERIZANDO PAINEL ADMIN APRIMORADO');
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50">
-        {/* Header Admin */}
-        <header className="bg-gradient-to-r from-red-500 to-red-600 shadow-2xl border-b border-red-200 sticky top-0 z-40">
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50">
+        {/* Header Admin Aprimorado */}
+        <header className="bg-gradient-to-r from-green-500 to-green-600 shadow-2xl border-b border-green-200 sticky top-0 z-40">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="bg-white p-2 rounded-xl">
-                  <Shield className="h-8 w-8 text-red-600" />
+                  <Shield className="h-8 w-8 text-green-600" />
                 </div>
                 <div>
                   <h1 className="text-xl md:text-2xl font-bold text-white">
-                    🔥 PAINEL ADMINISTRATIVO 🔥
+                    🔥 PAINEL ADMINISTRATIVO - VAGAS PG
                   </h1>
-                  <p className="text-red-100">
+                  <p className="text-green-100">
                     Controle Total do Sistema - {user?.email}
                   </p>
                 </div>
               </div>
               <div className="flex items-center space-x-3">
-                <Badge className="bg-white text-red-600 font-bold">
+                <Badge className="bg-white text-green-600 font-bold">
                   🔑 SUPER ADMIN
                 </Badge>
                 <Button
                   variant="outline"
                   onClick={handleSignOut}
-                  className="rounded-full bg-white text-red-600 hover:bg-red-50"
+                  className="rounded-full bg-white text-green-600 hover:bg-green-50"
                   size="sm"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
@@ -247,7 +270,7 @@ const Dashboard = () => {
 
         <div className="container mx-auto px-4 py-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-            <TabsList className="grid w-full grid-cols-3 bg-white/50 backdrop-blur-md rounded-2xl p-2">
+            <TabsList className="grid w-full grid-cols-4 bg-white/50 backdrop-blur-md rounded-2xl p-2">
               <TabsTrigger value="overview" className="rounded-xl text-xs md:text-sm">
                 <BarChart3 className="w-4 h-4 mr-1 md:mr-2" />
                 Estatísticas
@@ -259,6 +282,10 @@ const Dashboard = () => {
               <TabsTrigger value="applications" className="rounded-xl text-xs md:text-sm">
                 <Users className="w-4 h-4 mr-1 md:mr-2" />
                 Candidaturas
+              </TabsTrigger>
+              <TabsTrigger value="jobs" className="rounded-xl text-xs md:text-sm">
+                <Sparkles className="w-4 h-4 mr-1 md:mr-2" />
+                Busca IA
               </TabsTrigger>
             </TabsList>
 
@@ -276,6 +303,53 @@ const Dashboard = () => {
             <TabsContent value="applications" className="space-y-6">
               <AdminApplications />
             </TabsContent>
+
+            <TabsContent value="jobs" className="space-y-6">
+              <Card className="border-0 rounded-3xl shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-t-3xl">
+                  <CardTitle className="text-2xl font-bold flex items-center">
+                    <Sparkles className="h-6 w-6 mr-2" />
+                    🤖 Busca Inteligente de Vagas
+                  </CardTitle>
+                  <CardDescription className="text-purple-100">
+                    Busque as vagas mais recentes do LinkedIn e Google nas últimas 24h
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-8">
+                  <div className="text-center mb-6">
+                    <Button
+                      onClick={fetchLatestJobsFromAI}
+                      disabled={loadingLatestJobs}
+                      className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-2xl h-12 px-8 font-semibold text-lg"
+                    >
+                      {loadingLatestJobs ? (
+                        "🔍 Buscando vagas..."
+                      ) : (
+                        <>
+                          <Sparkles className="w-5 h-5 mr-2" />
+                          🚀 Buscar Vagas Recentes
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {latestJobs && (
+                    <Card className="bg-gray-50 border-gray-200 rounded-2xl">
+                      <CardHeader>
+                        <CardTitle className="text-gray-800 flex items-center gap-2">
+                          <Badge className="bg-purple-100 text-purple-800">Resultados da Busca</Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                          {latestJobs}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </div>
       </div>
@@ -284,7 +358,6 @@ const Dashboard = () => {
 
   console.log('🏢 RENDERIZANDO PAINEL DE EMPRESA - USUÁRIO NÃO É ADMIN');
 
-  // Se não for admin, mostrar painel de empresa
   if (loading && !company) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50 flex items-center justify-center">
@@ -417,7 +490,7 @@ const Dashboard = () => {
 
             {showJobForm && (
               <div className="mb-6">
-                <JobForm
+                <EnhancedJobForm
                   job={editingJob}
                   onSave={handleJobSaved}
                   onCancel={() => {

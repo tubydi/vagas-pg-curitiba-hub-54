@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -34,7 +35,10 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
     location: "",
     contract_type: "" as ContractType,
     work_mode: "" as WorkMode,
-    experience_level: "" as ExperienceLevel
+    experience_level: "" as ExperienceLevel,
+    has_external_application: false,
+    application_method: "",
+    contact_info: ""
   });
 
   const [benefitsList, setBenefitsList] = useState<string[]>([]);
@@ -50,7 +54,10 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
         location: job.location || "",
         contract_type: job.contract_type || "" as ContractType,
         work_mode: job.work_mode || "" as WorkMode,
-        experience_level: job.experience_level || "" as ExperienceLevel
+        experience_level: job.experience_level || "" as ExperienceLevel,
+        has_external_application: job.has_external_application || false,
+        application_method: job.application_method || "",
+        contact_info: job.contact_info || ""
       });
       setBenefitsList(job.benefits || []);
     }
@@ -108,7 +115,7 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -250,6 +257,54 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
                 </Select>
               </div>
             </div>
+          </div>
+
+          {/* Candidatura Externa */}
+          <div className="space-y-6">
+            <h4 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">Candidatura Externa</h4>
+            
+            <div className="flex items-center space-x-3">
+              <Switch
+                id="has_external_application"
+                checked={formData.has_external_application}
+                onCheckedChange={(checked) => handleInputChange("has_external_application", checked)}
+              />
+              <Label htmlFor="has_external_application" className="text-base font-semibold">
+                Permitir candidatura direta com a empresa
+              </Label>
+            </div>
+
+            {formData.has_external_application && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="application_method" className="text-base font-semibold">Método de Candidatura</Label>
+                  <Select value={formData.application_method} onValueChange={(value) => handleInputChange("application_method", value)}>
+                    <SelectTrigger className="mt-2 h-12 rounded-xl">
+                      <SelectValue placeholder="Selecione o método" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                      <SelectItem value="Email">Email</SelectItem>
+                      <SelectItem value="Telefone">Telefone</SelectItem>
+                      <SelectItem value="Presencial">Presencial</SelectItem>
+                      <SelectItem value="Site">Site</SelectItem>
+                      <SelectItem value="Outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="contact_info" className="text-base font-semibold">Informação de Contato</Label>
+                  <Input
+                    id="contact_info"
+                    value={formData.contact_info}
+                    onChange={(e) => handleInputChange("contact_info", e.target.value)}
+                    placeholder="Ex: (42) 9999-9999 ou email@empresa.com"
+                    className="mt-2 h-12 rounded-xl"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Benefícios */}

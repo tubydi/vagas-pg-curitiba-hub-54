@@ -124,12 +124,15 @@ export type Database = {
       }
       jobs: {
         Row: {
+          application_method: string | null
           benefits: string[] | null
           company_id: string
+          contact_info: string | null
           contract_type: Database["public"]["Enums"]["contract_type"]
           created_at: string
           description: string
           experience_level: Database["public"]["Enums"]["experience_level"]
+          has_external_application: boolean | null
           id: string
           location: string
           requirements: string
@@ -140,12 +143,15 @@ export type Database = {
           work_mode: Database["public"]["Enums"]["work_mode"]
         }
         Insert: {
+          application_method?: string | null
           benefits?: string[] | null
           company_id: string
+          contact_info?: string | null
           contract_type: Database["public"]["Enums"]["contract_type"]
           created_at?: string
           description: string
           experience_level: Database["public"]["Enums"]["experience_level"]
+          has_external_application?: boolean | null
           id?: string
           location: string
           requirements: string
@@ -156,12 +162,15 @@ export type Database = {
           work_mode: Database["public"]["Enums"]["work_mode"]
         }
         Update: {
+          application_method?: string | null
           benefits?: string[] | null
           company_id?: string
+          contact_info?: string | null
           contract_type?: Database["public"]["Enums"]["contract_type"]
           created_at?: string
           description?: string
           experience_level?: Database["public"]["Enums"]["experience_level"]
+          has_external_application?: boolean | null
           id?: string
           location?: string
           requirements?: string

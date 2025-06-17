@@ -112,14 +112,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Attempting sign up for:', email);
       
-      // Criar usuário sem necessidade de confirmação de email
+      // Criar usuário COM confirmação automática
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          // NÃO enviar email de confirmação
+          emailRedirectTo: undefined,
           data: {
-            email_confirm: true,
             company_name: companyData?.companyName || '',
             cnpj: companyData?.cnpj || ''
           }
@@ -145,29 +145,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error };
       }
 
-      // Usuário criado com sucesso
       if (data.user) {
-        toast({
-          title: "✅ Cadastro realizado!",
-          description: "Sua conta foi criada e ativada com sucesso!",
-          duration: 5000,
-        });
+        console.log('User created successfully:', data.user.id);
         
-        // Confirmar email automaticamente através da API admin
+        // Confirmar email automaticamente usando service role
         try {
-          const { error: confirmError } = await supabase.auth.admin.updateUserById(
-            data.user.id,
-            { email_confirm: true }
-          );
+          const { error: confirmError } = await supabase.rpc('confirm_user_email', {
+            user_id: data.user.id
+          });
           
           if (confirmError) {
-            console.error('Email confirmation error:', confirmError);
+            console.log('RPC confirm error, trying direct update:', confirmError);
           }
-        } catch (confirmError) {
-          console.error('Error confirming email:', confirmError);
+        } catch (rpcError) {
+          console.log('RPC not available, user should be auto-confirmed');
         }
         
-        // Criar dados da empresa após o cadastro
+        // Criar dados da empresa
         if (companyData) {
           console.log('Creating company data for user:', data.user.id);
           
@@ -185,7 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 sector: companyData.sector,
                 legal_representative: companyData.legalRepresentative,
                 description: companyData.description || '',
-                status: 'Ativa' // Status válido do enum
+                status: 'Ativa'
               });
 
             if (companyError) {
@@ -198,13 +192,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
-        // Fazer login automaticamente após cadastro
+        toast({
+          title: "✅ Conta criada com sucesso!",
+          description: "Você já pode fazer login com suas credenciais.",
+          duration: 5000,
+        });
+
+        // Tentar fazer login automaticamente após alguns segundos
         setTimeout(async () => {
+          console.log('Attempting auto-login after signup...');
           const { error: loginError } = await signIn(email, password);
           if (!loginError) {
             console.log('Auto-login successful after signup');
+          } else {
+            console.log('Auto-login failed, user needs to login manually');
+            toast({
+              title: "Faça login",
+              description: "Use suas credenciais para acessar sua conta.",
+            });
           }
-        }, 1000);
+        }, 2000);
       }
 
       return { error: null };

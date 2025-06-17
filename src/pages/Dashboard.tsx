@@ -70,19 +70,20 @@ const Dashboard = () => {
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
 
-  console.log('🔍 Dashboard - isAdmin:', isAdmin, 'user:', user?.email);
+  console.log('🏠 Dashboard - user:', user?.email, 'isAdmin:', isAdmin);
 
   useEffect(() => {
     if (user) {
-      console.log('👤 Usuário logado no dashboard:', user.email, 'isAdmin:', isAdmin);
+      console.log('👤 Usuário no dashboard:', user.email, 'É ADMIN?', isAdmin);
       
       // Se for admin, não buscar dados de empresa
-      if (!isAdmin) {
+      if (isAdmin) {
+        console.log('🔑 USUÁRIO É ADMIN - NÃO BUSCANDO DADOS DE EMPRESA');
+        setLoading(false);
+      } else {
+        console.log('🏢 Usuário é empresa - buscando dados...');
         fetchCompanyData();
         fetchJobs();
-      } else {
-        console.log('🔑 Usuário é ADMIN - não buscando dados de empresa');
-        setLoading(false);
       }
     }
   }, [user, isAdmin]);
@@ -202,9 +203,11 @@ const Dashboard = () => {
     }
   };
 
-  // Se for admin, mostrar painel administrativo
+  // VERIFICAÇÃO CRÍTICA: Se for admin, mostrar painel administrativo
+  console.log('🔍 VERIFICAÇÃO FINAL - isAdmin:', isAdmin, 'user email:', user?.email);
+  
   if (isAdmin) {
-    console.log('🔑 Renderizando painel ADMIN');
+    console.log('🔥🔥🔥 RENDERIZANDO PAINEL ADMIN - USUÁRIO É ADMIN!');
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50">
         {/* Header Admin */}
@@ -278,6 +281,8 @@ const Dashboard = () => {
       </div>
     );
   }
+
+  console.log('🏢 RENDERIZANDO PAINEL DE EMPRESA - USUÁRIO NÃO É ADMIN');
 
   // Se não for admin, mostrar painel de empresa
   if (loading && !company) {

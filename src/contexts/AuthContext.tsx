@@ -31,68 +31,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   const checkAdminStatus = async (userEmail: string | undefined) => {
+    console.log('🔍🔍🔍 VERIFICANDO ADMIN PARA:', userEmail);
+    
     if (!userEmail) {
+      console.log('❌ Sem email, não é admin');
       setIsAdmin(false);
       return;
     }
 
-    console.log('🔍 Verificando status de admin para:', userEmail);
-    
-    // Verificar se é o email de admin
-    const isAdminEmail = userEmail === 'admin@vagaspg.com';
-    console.log('📧 É email de admin?', isAdminEmail);
-    
-    if (isAdminEmail) {
-      // Verificar se existe um perfil admin no banco
-      try {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('email', userEmail)
-          .single();
-
-        console.log('👤 Perfil encontrado:', profile);
-        console.log('❌ Erro ao buscar perfil:', error);
-
-        if (profile && profile.role === 'admin') {
-          console.log('✅ CONFIRMADO: Usuário é ADMIN pelo perfil');
-          setIsAdmin(true);
-        } else {
-          console.log('⚠️ Perfil admin não encontrado, mas email é de admin - definindo como admin');
-          setIsAdmin(true);
-        }
-      } catch (error) {
-        console.error('❌ Erro ao verificar perfil admin:', error);
-        // Se houve erro mas o email é de admin, considerar como admin mesmo assim
-        setIsAdmin(true);
-      }
-    } else {
-      console.log('❌ Não é email de admin');
-      setIsAdmin(false);
+    // VERIFICAÇÃO DIRETA: se o email é admin@vagaspg.com, É ADMIN!
+    if (userEmail === 'admin@vagaspg.com') {
+      console.log('🔥🔥🔥 EMAIL É ADMIN@VAGASPG.COM - DEFININDO COMO ADMIN!');
+      setIsAdmin(true);
+      return;
     }
+
+    console.log('❌ Email não é admin@vagaspg.com, não é admin');
+    setIsAdmin(false);
   };
 
   useEffect(() => {
+    console.log('🚀 Iniciando AuthProvider...');
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth state changed:', event, session?.user?.email);
+        console.log('🔄 Auth state changed:', event);
+        console.log('👤 Session user:', session?.user?.email);
+        
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          console.log('👤 Usuário logado:', session.user.email);
+          console.log('✅ Usuário logado:', session.user.email);
           await checkAdminStatus(session.user.email);
-          
-          // Redirecionar para dashboard após login
-          console.log('🔀 Redirecionando para /dashboard');
-          setTimeout(() => {
-            if (window.location.pathname === '/auth') {
-              window.location.href = '/dashboard';
-            }
-          }, 100);
         } else {
-          console.log('👤 Usuário deslogado');
+          console.log('❌ Usuário deslogado');
           setIsAdmin(false);
         }
         
@@ -102,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('🔍 Verificação inicial de sessão:', session?.user?.email);
+      console.log('🔍 Sessão inicial:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       

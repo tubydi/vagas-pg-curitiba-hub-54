@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +33,9 @@ interface Job {
   benefits: string[] | null;
   company_id: string;
   companies: Company;
+  has_external_application?: boolean;
+  application_method?: string;
+  contact_info?: string;
 }
 
 const Index = () => {

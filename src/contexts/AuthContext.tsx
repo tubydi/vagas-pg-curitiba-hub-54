@@ -49,14 +49,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (isAdminUser) {
             console.log('Admin user detected, redirecting to /admin');
             setTimeout(() => {
-              if (window.location.pathname === '/auth') {
+              if (window.location.pathname === '/auth' || window.location.pathname === '/dashboard') {
                 window.location.href = '/admin';
               }
             }, 100);
           } else {
             console.log('Regular user, redirecting to /dashboard');
             setTimeout(() => {
-              if (window.location.pathname === '/auth') {
+              if (window.location.pathname === '/auth' || window.location.pathname === '/admin') {
                 window.location.href = '/dashboard';
               }
             }, 100);
@@ -79,6 +79,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const isAdminUser = session.user.email === 'admin@vagaspg.com';
         console.log('Initial admin check:', isAdminUser, 'for user:', session.user.email);
         setIsAdmin(isAdminUser);
+        
+        // Redirecionamento inicial
+        if (isAdminUser && window.location.pathname === '/dashboard') {
+          window.location.href = '/admin';
+        } else if (!isAdminUser && window.location.pathname === '/admin') {
+          window.location.href = '/dashboard';
+        }
       }
       
       setLoading(false);

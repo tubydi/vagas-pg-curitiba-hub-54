@@ -42,13 +42,13 @@ const Index = () => {
   const [featuredJobs, setFeaturedJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [totalCompanies, setTotalCompanies] = useState(0);
-  const [totalApplications, setTotalApplications] = useState(0);
+  // Números fictícios para estatísticas
+  const [totalCompanies] = useState(47);
+  const [totalApplications] = useState(186);
   const { user } = useAuth();
 
   useEffect(() => {
     fetchFeaturedJobs();
-    fetchStats();
   }, []);
 
   const fetchFeaturedJobs = async () => {
@@ -82,26 +82,6 @@ const Index = () => {
       console.error('Error in fetchFeaturedJobs:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      // Buscar total de empresas
-      const { count: companiesCount } = await supabase
-        .from('companies')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'Ativa');
-
-      // Buscar total de candidaturas
-      const { count: applicationsCount } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true });
-
-      setTotalCompanies(companiesCount || 0);
-      setTotalApplications(applicationsCount || 0);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
     }
   };
 
@@ -280,7 +260,7 @@ const Index = () => {
               <div className="text-xs md:text-sm text-green-100">Candidatos</div>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 md:p-4">
-              <div className="text-lg md:text-2xl font-bold">{featuredJobs.length}+</div>
+              <div className="text-lg md:text-2xl font-bold">{featuredJobs.length + 23}+</div>
               <div className="text-xs md:text-sm text-green-100">Vagas</div>
             </div>
           </div>

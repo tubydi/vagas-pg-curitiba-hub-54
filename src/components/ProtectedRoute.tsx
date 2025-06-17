@@ -25,6 +25,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       } else if (requireAdmin && !isAdmin) {
         console.log('Admin required but user is not admin, redirecting to dashboard');
         navigate("/dashboard");
+      } else if (!requireAdmin && isAdmin && window.location.pathname === '/dashboard') {
+        console.log('Admin user accessing regular dashboard, redirecting to admin');
+        navigate("/admin");
       }
     }
   }, [user, loading, isAdmin, requireAdmin, navigate]);

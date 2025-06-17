@@ -7,6 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
+
+type ApplicationStatus = Database['public']['Enums']['application_status'];
 
 interface JobApplicationFormProps {
   job: any;
@@ -168,7 +171,7 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
         skills: skillsArray,
         cover_letter: formData.cover_letter.trim() || null,
         resume_url: resumeUrl,
-        status: 'Novo'
+        status: 'Novo' as ApplicationStatus
       };
 
       console.log('Dados da candidatura:', applicationData);

@@ -118,21 +118,34 @@ const Auth = () => {
 
     try {
       // Criar usuário no Supabase Auth
-      const { data: authData, error: authError } = await signUp(companyData.email, companyData.password);
+      const { error: authError } = await signUp(companyData.email, companyData.password);
       
       if (authError) {
         setLoading(false);
         return;
       }
 
-      // Aguardar um pouco para o trigger criar o profile
+      // Aguardar um pouco para o processo de criação do usuário
       await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Obter o usuário atual
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (!currentUser) {
+        toast({
+          title: "Erro no cadastro",
+          description: "Erro ao obter dados do usuário. Tente novamente.",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
 
       // Criar empresa no banco
       const { error: companyError } = await supabase
         .from('companies')
         .insert({
-          user_id: authData.user?.id,
+          user_id: currentUser.id,
           name: companyData.companyName,
           cnpj: companyData.cnpj.replace(/\D/g, ''),
           email: companyData.email,

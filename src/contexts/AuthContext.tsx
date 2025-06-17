@@ -43,17 +43,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Check admin status
           setTimeout(async () => {
             try {
+              console.log('Checking admin status for user:', session.user.id);
+              
+              // Verificar se é o admin específico
+              if (session.user.email === 'admin@vagaspg.com') {
+                console.log('User is admin by email');
+                setIsAdmin(true);
+                return;
+              }
+              
+              // Verificar na tabela profiles
               const { data: profile } = await supabase
                 .from('profiles')
                 .select('role')
                 .eq('id', session.user.id)
                 .maybeSingle();
               
+              console.log('User profile:', profile);
               setIsAdmin(profile?.role === 'admin');
             } catch (error) {
               console.error('Error checking admin status:', error);
+              setIsAdmin(false);
             }
-          }, 0);
+          }, 100);
         } else {
           setIsAdmin(false);
         }
@@ -95,6 +107,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
+        console.log('Login successful for:', email);
+        
+        // Verificar se é admin
+        if (email === 'admin@vagaspg.com') {
+          console.log('Admin user logged in');
+          setIsAdmin(true);
+        }
+        
         toast({
           title: "Login realizado",
           description: "Bem-vindo de volta!",

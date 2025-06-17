@@ -54,10 +54,6 @@ const JobList = () => {
   const [isApplicationFormOpen, setIsApplicationFormOpen] = useState(false);
   const { user } = useAuth();
 
-  useEffect(() => {
-    fetchJobs();
-  }, []);
-
   const fetchJobs = async () => {
     try {
       console.log('Fetching jobs...');
@@ -82,7 +78,7 @@ const JobList = () => {
         return;
       }
 
-      console.log('Jobs fetched:', data);
+      console.log('Jobs fetched successfully:', data?.length || 0, 'jobs');
       setJobs(data || []);
     } catch (error) {
       console.error('Error in fetchJobs:', error);
@@ -90,6 +86,10 @@ const JobList = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchJobs();
+  }, []);
 
   const handleApplyJob = (job: Job) => {
     setSelectedJob(job);

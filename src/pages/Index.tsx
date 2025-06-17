@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,80 +8,81 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Building2, MapPin, Search, Star, Clock, DollarSign, Brain, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import JobApplicationForm from "@/components/JobApplicationForm";
+
+interface Company {
+  id: string;
+  name: string;
+  city: string;
+  sector: string;
+}
+
+interface Job {
+  id: string;
+  title: string;
+  description: string;
+  requirements: string;
+  salary: string;
+  location: string;
+  contract_type: string;
+  work_mode: string;
+  experience_level: string;
+  status: string;
+  created_at: string;
+  benefits: string[] | null;
+  company_id: string;
+  companies: Company;
+}
 
 const Index = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCity, setSelectedCity] = useState("all");
-  const [selectedJob, setSelectedJob] = useState<any | null>(null);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isApplicationFormOpen, setIsApplicationFormOpen] = useState(false);
+  const [featuredJobs, setFeaturedJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  // Mock data para demonstração
-  const featuredJobs = [
-    {
-      id: "1",
-      title: "Desenvolvedor Full Stack",
-      company: "Tech PG",
-      location: "Ponta Grossa",
-      salary: "R$ 8.000 - R$ 12.000",
-      type: "CLT",
-      workMode: "Híbrido",
-      featured: true,
-      description: "Desenvolvimento de aplicações web modernas com React e Node.js",
-      postedAt: "2 dias atrás",
-      companies: {
-        name: "Tech PG",
-      }
-    },
-    {
-      id: "2",
-      title: "Analista de Marketing Digital",
-      company: "Marketing Solutions",
-      location: "Curitiba",
-      salary: "R$ 5.000 - R$ 7.000",
-      type: "CLT",
-      workMode: "Presencial",
-      featured: true,
-      description: "Gestão de campanhas digitais e análise de métricas",
-      postedAt: "1 dia atrás",
-      companies: {
-        name: "Marketing Solutions",
-      }
-    },
-    {
-      id: "3",
-      title: "Designer UX/UI",
-      company: "Creative Agency",
-      location: "Ponta Grossa",
-      salary: "R$ 6.000 - R$ 9.000",
-      type: "PJ",
-      workMode: "Remoto",
-      featured: false,
-      description: "Criação de interfaces intuitivas e experiências digitais",
-      postedAt: "3 dias atrás",
-      companies: {
-        name: "Creative Agency",
-      }
-    },
-    {
-      id: "4",
-      title: "Analista de Vendas",
-      company: "Vendas Plus",
-      location: "Curitiba",
-      salary: "R$ 4.000 - R$ 6.000",
-      type: "CLT",
-      workMode: "Presencial",
-      featured: false,
-      description: "Prospecção de clientes e gestão de pipeline de vendas",
-      postedAt: "1 semana atrás",
-      companies: {
-        name: "Vendas Plus",
-      }
-    }
-  ];
+  useEffect(() => {
+    fetchFeaturedJobs();
+  }, []);
 
-  const handleApplyJob = (job: any) => {
+  const fetchFeaturedJobs = async () => {
+    try {
+      console.log('Fetching featured jobs...');
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          companies!inner (
+            id,
+            name,
+            city,
+            sector
+          )
+        `)
+        .eq('status', 'Ativa')
+        .order('created_at', { ascending: false })
+        .limit(4);
+
+      if (error) {
+        console.error('Error fetching featured jobs:', error);
+        return;
+      }
+
+      console.log('Featured jobs fetched successfully:', data?.length || 0, 'jobs');
+      setFeaturedJobs(data || []);
+    } catch (error) {
+      console.error('Error in fetchFeaturedJobs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApplyJob = (job: Job) => {
     setSelectedJob(job);
     setIsApplicationFormOpen(true);
   };
@@ -201,7 +202,7 @@ const Index = () => {
               <div className="text-sm text-green-100">Candidatos</div>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4">
-              <div className="text-2xl font-bold">500+</div>
+              <div className="text-2xl font-bold">{featuredJobs.length}+</div>
               <div className="text-sm text-green-100">Vagas</div>
             </div>
           </div>
@@ -245,68 +246,80 @@ const Index = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
-            {featuredJobs.map((job, index) => (
-              <Card key={job.id} className="group hover:shadow-2xl transition-all duration-500 border-0 bg-white rounded-3xl overflow-hidden">
-                <CardHeader className="bg-gradient-to-br from-gray-50 to-green-50 pb-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <CardTitle className="text-xl font-bold text-gray-900 group-hover:text-green-600 transition-colors line-clamp-2">
-                        {job.title}
-                      </CardTitle>
-                      <CardDescription className="text-green-600 font-semibold text-lg mt-1">
-                        {job.company}
-                      </CardDescription>
-                    </div>
-                    {job.featured && (
-                      <Badge className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-900 border-0 rounded-full px-3 py-1 shrink-0">
-                        <Star className="w-3 h-3 mr-1" />
-                        Destaque
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center text-sm text-gray-500 mb-2">
-                    <Clock className="w-4 h-4 mr-1" />
-                    {job.postedAt}
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="p-6">
-                  <p className="text-gray-600 mb-6 line-clamp-2">{job.description}</p>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between text-gray-700">
-                      <div className="flex items-center">
-                        <MapPin className="w-5 h-5 mr-2 text-green-500" />
-                        <span className="font-medium">{job.location}</span>
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Carregando vagas em destaque...</p>
+            </div>
+          ) : featuredJobs.length === 0 ? (
+            <div className="text-center py-12">
+              <Building2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">Nenhuma vaga disponível no momento</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
+              {featuredJobs.map((job, index) => (
+                <Card key={job.id} className="group hover:shadow-2xl transition-all duration-500 border-0 bg-white rounded-3xl overflow-hidden">
+                  <CardHeader className="bg-gradient-to-br from-gray-50 to-green-50 pb-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <CardTitle className="text-xl font-bold text-gray-900 group-hover:text-green-600 transition-colors line-clamp-2">
+                          {job.title}
+                        </CardTitle>
+                        <CardDescription className="text-green-600 font-semibold text-lg mt-1">
+                          {job.companies.name}
+                        </CardDescription>
                       </div>
-                      <Badge variant="outline" className="rounded-full">
-                        {job.workMode}
-                      </Badge>
+                      {index < 2 && (
+                        <Badge className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-900 border-0 rounded-full px-3 py-1 shrink-0">
+                          <Star className="w-3 h-3 mr-1" />
+                          Destaque
+                        </Badge>
+                      )}
                     </div>
                     
-                    <div className="flex items-center justify-between text-gray-700">
-                      <div className="flex items-center">
-                        <DollarSign className="w-5 h-5 mr-2 text-green-500" />
-                        <span className="font-bold text-lg text-green-600">{job.salary}</span>
-                      </div>
-                      <Badge variant="outline" className="rounded-full">
-                        {job.type}
-                      </Badge>
+                    <div className="flex items-center text-sm text-gray-500 mb-2">
+                      <Clock className="w-4 h-4 mr-1" />
+                      {new Date(job.created_at).toLocaleDateString('pt-BR')}
                     </div>
-                  </div>
+                  </CardHeader>
                   
-                  <Button 
-                    onClick={() => handleApplyJob(job)}
-                    className="w-full mt-6 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
-                  >
-                    Candidatar-se Agora
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <CardContent className="p-6">
+                    <p className="text-gray-600 mb-6 line-clamp-2">{job.description}</p>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between text-gray-700">
+                        <div className="flex items-center">
+                          <MapPin className="w-5 h-5 mr-2 text-green-500" />
+                          <span className="font-medium">{job.location}</span>
+                        </div>
+                        <Badge variant="outline" className="rounded-full">
+                          {job.work_mode}
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-gray-700">
+                        <div className="flex items-center">
+                          <DollarSign className="w-5 h-5 mr-2 text-green-500" />
+                          <span className="font-bold text-lg text-green-600">{job.salary}</span>
+                        </div>
+                        <Badge variant="outline" className="rounded-full">
+                          {job.contract_type}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      onClick={() => handleApplyJob(job)}
+                      className="w-full mt-6 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+                    >
+                      Candidatar-se Agora
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
           <div className="text-center mt-12">
             <Link to="/jobs">

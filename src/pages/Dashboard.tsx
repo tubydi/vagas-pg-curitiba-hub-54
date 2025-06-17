@@ -1,172 +1,162 @@
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Plus, Users, Briefcase, Eye, Edit, Trash2, LogOut, CheckCircle, XCircle, Clock, Mail } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Building2, 
+  Briefcase, 
+  Users, 
+  Plus, 
+  Settings, 
+  BarChart3,
+  Eye,
+  Edit,
+  Trash2,
+  User,
+  LogOut
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 import JobForm from "@/components/JobForm";
-import { Link, useNavigate } from "react-router-dom";
-import ApplicationDetails from "@/components/ApplicationDetails";
+import CompanyStats from "@/components/CompanyStats";
+import CandidatesList from "@/components/CandidatesList";
+import CompanyProfileEdit from "@/components/CompanyProfileEdit";
+
+interface Company {
+  id: string;
+  name: string;
+  cnpj: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  sector: string;
+  legal_representative: string;
+  description: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Job {
+  id: string;
+  title: string;
+  description: string;
+  requirements: string;
+  salary: string;
+  location: string;
+  contract_type: string;
+  work_mode: string;
+  experience_level: string;
+  status: string;
+  created_at: string;
+  benefits: string[] | null;
+  company_id: string;
+}
 
 const Dashboard = () => {
   const { user, signOut, isAdmin } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [company, setCompany] = useState<any>(null);
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [applications, setApplications] = useState<any[]>([]);
+  
+  const [company, setCompany] = useState<Company | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [showJobForm, setShowJobForm] = useState(false);
-  const [editingJob, setEditingJob] = useState<any>(null);
-  const [selectedApplication, setSelectedApplication] = useState<any>(null);
-  const [stats, setStats] = useState({
-    totalJobs: 0,
-    activeJobs: 0,
-    totalApplications: 0,
-    newApplications: 0
-  });
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     if (user) {
       fetchCompanyData();
       fetchJobs();
-      fetchApplications();
     }
   }, [user]);
 
   const fetchCompanyData = async () => {
     try {
-      console.log('Fetching company data for user:', user?.id);
-      
       const { data, error } = await supabase
         .from('companies')
         .select('*')
         .eq('user_id', user?.id)
-        .maybeSingle();
+        .single();
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching company:', error);
         return;
       }
 
-      console.log('Company data:', data);
       setCompany(data);
-      
-      if (!data) {
-        toast({
-          title: "Cadastro incompleto",
-          description: "Complete sua confirmação de email primeiro para acessar o painel",
-          variant: "destructive",
-        });
-      }
     } catch (error) {
-      console.error('Error in fetchCompanyData:', error);
+      console.error('Error:', error);
     }
   };
 
   const fetchJobs = async () => {
     try {
-      if (!user) return;
-      
-      console.log('Fetching jobs for user:', user.id);
-      
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('company_id', company?.id || 'none')
-        .order('created_at', { ascending: false });
+      setLoading(true);
 
-      if (error) {
-        console.error('Error fetching jobs:', error);
-        return;
+      if (!company) {
+        // Se ainda não temos os dados da empresa, vamos buscar primeiro
+        const { data: companyData } = await supabase
+          .from('companies')
+          .select('id')
+          .eq('user_id', user?.id)
+          .single();
+
+        if (!companyData) return;
+
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('*')
+          .eq('company_id', companyData.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching jobs:', error);
+          return;
+        }
+
+        setJobs(data || []);
+      } else {
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('*')
+          .eq('company_id', company.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching jobs:', error);
+          return;
+        }
+
+        setJobs(data || []);
       }
-
-      console.log('Jobs fetched:', data);
-      setJobs(data || []);
-      
-      // Update stats
-      const activeJobs = data?.filter(job => job.status === 'Ativa').length || 0;
-      setStats(prev => ({
-        ...prev,
-        totalJobs: data?.length || 0,
-        activeJobs
-      }));
     } catch (error) {
       console.error('Error in fetchJobs:', error);
-    }
-  };
-
-  const fetchApplications = async () => {
-    try {
-      if (!company?.id) return;
-      
-      console.log('Fetching applications for company:', company.id);
-      
-      const { data, error } = await supabase
-        .from('applications')
-        .select(`
-          *,
-          jobs!inner (
-            title,
-            company_id
-          )
-        `)
-        .eq('jobs.company_id', company.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching applications:', error);
-        return;
-      }
-
-      console.log('Applications fetched:', data);
-      setApplications(data || []);
-      
-      // Update stats
-      const newApplications = data?.filter(app => app.status === 'Novo').length || 0;
-      setStats(prev => ({
-        ...prev,
-        totalApplications: data?.length || 0,
-        newApplications
-      }));
-    } catch (error) {
-      console.error('Error in fetchApplications:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Re-fetch applications when company changes
-  useEffect(() => {
-    if (company?.id) {
-      fetchApplications();
-    }
-  }, [company]);
-
-  const handleCreateJob = () => {
-    if (!company) {
-      toast({
-        title: "Cadastro incompleto",
-        description: "Complete sua confirmação de email primeiro para criar vagas",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+  const handleJobSaved = () => {
+    setShowJobForm(false);
     setEditingJob(null);
-    setShowJobForm(true);
+    fetchJobs();
   };
 
-  const handleEditJob = (job: any) => {
+  const handleEditJob = (job: Job) => {
     setEditingJob(job);
     setShowJobForm(true);
   };
 
   const handleDeleteJob = async (jobId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta vaga?')) return;
+
     try {
       const { error } = await supabase
         .from('jobs')
@@ -177,7 +167,7 @@ const Dashboard = () => {
         console.error('Error deleting job:', error);
         toast({
           title: "Erro",
-          description: "Erro ao excluir vaga",
+          description: "Erro ao excluir vaga.",
           variant: "destructive",
         });
         return;
@@ -185,127 +175,31 @@ const Dashboard = () => {
 
       toast({
         title: "Vaga excluída",
-        description: "A vaga foi excluída com sucesso",
+        description: "A vaga foi excluída com sucesso.",
       });
 
       fetchJobs();
     } catch (error) {
-      console.error('Error in handleDeleteJob:', error);
+      console.error('Error:', error);
     }
   };
 
-  const handleJobSaved = () => {
-    setShowJobForm(false);
-    setEditingJob(null);
-    fetchJobs();
-  };
-
-  const handleLogout = async () => {
+  const handleSignOut = async () => {
     try {
-      console.log('Iniciando logout...');
       await signOut();
-      
-      // Limpar dados locais
-      setCompany(null);
-      setJobs([]);
-      setApplications([]);
-      
-      // Redirecionar para home
-      navigate('/', { replace: true });
-      
-      toast({
-        title: "Logout realizado",
-        description: "Você foi desconectado com sucesso",
-      });
+      navigate('/');
     } catch (error) {
-      console.error('Error during logout:', error);
-      toast({
-        title: "Erro no logout",
-        description: "Ocorreu um erro ao sair",
-        variant: "destructive",
-      });
+      console.error('Error signing out:', error);
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'Novo':
-        return <Clock className="w-4 h-4 text-blue-500" />;
-      case 'Em análise':
-        return <Eye className="w-4 h-4 text-yellow-500" />;
-      case 'Aprovado':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'Rejeitado':
-        return <XCircle className="w-4 h-4 text-red-500" />;
-      default:
-        return <Clock className="w-4 h-4 text-gray-500" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Novo':
-        return 'bg-blue-100 text-blue-800';
-      case 'Em análise':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'Aprovado':
-        return 'bg-green-100 text-green-800';
-      case 'Rejeitado':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  if (loading) {
+  if (loading && !company) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando painel...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando dashboard...</p>
         </div>
-      </div>
-    );
-  }
-
-  if (!company) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50 flex items-center justify-center p-6">
-        <Card className="w-full max-w-md border-0 shadow-2xl rounded-3xl">
-          <CardHeader className="text-center bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-3xl">
-            <Building2 className="w-12 h-12 mx-auto mb-4" />
-            <CardTitle className="text-2xl">Cadastro Pendente</CardTitle>
-            <CardDescription className="text-green-100">
-              Complete sua confirmação de email primeiro para acessar o painel
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-8 text-center">
-            <div className="mb-6">
-              <Mail className="w-16 h-16 text-green-600 mx-auto mb-4" />
-              <p className="text-gray-600 mb-4">
-                Verifique sua caixa de entrada e clique no link de confirmação que enviamos para ativar sua conta.
-              </p>
-              <p className="text-sm text-gray-500">
-                Após confirmar seu email, você poderá acessar o painel completo da empresa.
-              </p>
-            </div>
-            <div className="space-y-3">
-              <Button 
-                onClick={handleLogout}
-                variant="outline" 
-                className="w-full rounded-xl"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Sair
-              </Button>
-              <Link to="/">
-                <Button variant="outline" className="w-full rounded-xl">
-                  Voltar ao Site
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -316,25 +210,27 @@ const Dashboard = () => {
       <header className="bg-white/90 backdrop-blur-md shadow-lg border-b border-green-100 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <div className="bg-gradient-to-r from-green-500 to-green-600 p-2 rounded-xl">
                 <Building2 className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{company.name}</h1>
-                <p className="text-green-600 font-medium">{company.city} • {company.sector}</p>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent">
+                  Dashboard - {company?.name || 'Empresa'}
+                </h1>
+                <p className="text-sm text-gray-600">
+                  {isAdmin ? 'Administrador' : 'Painel da Empresa'}
+                </p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <Link to="/">
-                <Button variant="outline" className="rounded-full">
-                  Ver Site
-                </Button>
-              </Link>
-              <Button 
-                onClick={handleLogout}
-                variant="outline" 
-                className="rounded-full border-red-200 text-red-600 hover:bg-red-50"
+              <Badge variant={company?.status === 'Ativa' ? 'default' : 'secondary'}>
+                {company?.status || 'Pendente'}
+              </Badge>
+              <Button
+                variant="outline"
+                onClick={handleSignOut}
+                className="rounded-full"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Sair
@@ -345,245 +241,191 @@ const Dashboard = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-0 shadow-lg rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-sm font-medium">Total de Vagas</p>
-                  <p className="text-3xl font-bold">{stats.totalJobs}</p>
-                </div>
-                <Briefcase className="w-10 h-10 text-blue-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg rounded-2xl bg-gradient-to-br from-green-500 to-green-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-sm font-medium">Vagas Ativas</p>
-                  <p className="text-3xl font-bold">{stats.activeJobs}</p>
-                </div>
-                <CheckCircle className="w-10 h-10 text-green-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-100 text-sm font-medium">Candidaturas</p>
-                  <p className="text-3xl font-bold">{stats.totalApplications}</p>
-                </div>
-                <Users className="w-10 h-10 text-purple-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-orange-100 text-sm font-medium">Novas</p>
-                  <p className="text-3xl font-bold">{stats.newApplications}</p>
-                </div>
-                <Clock className="w-10 h-10 text-orange-200" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <Tabs defaultValue="jobs" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 bg-white rounded-2xl shadow-sm p-1">
-            <TabsTrigger value="jobs" className="rounded-xl font-semibold">
-              Minhas Vagas
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+          <TabsList className="grid w-full grid-cols-5 bg-white/50 backdrop-blur-md rounded-2xl p-2">
+            <TabsTrigger value="overview" className="rounded-xl">
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Visão Geral
             </TabsTrigger>
-            <TabsTrigger value="applications" className="rounded-xl font-semibold">
-              Candidaturas
+            <TabsTrigger value="jobs" className="rounded-xl">
+              <Briefcase className="w-4 h-4 mr-2" />
+              Vagas
+            </TabsTrigger>
+            <TabsTrigger value="candidates" className="rounded-xl">
+              <Users className="w-4 h-4 mr-2" />
+              Candidatos
+            </TabsTrigger>
+            <TabsTrigger value="profile" className="rounded-xl">
+              <User className="w-4 h-4 mr-2" />
+              Perfil
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="rounded-xl">
+              <Settings className="w-4 h-4 mr-2" />
+              Configurações
             </TabsTrigger>
           </TabsList>
 
-          {/* Jobs Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            <CompanyStats companyId={company?.id || ''} />
+          </TabsContent>
+
           <TabsContent value="jobs" className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">Gerenciar Vagas</h2>
-              <Button 
-                onClick={handleCreateJob}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl shadow-lg"
+              <h2 className="text-3xl font-bold">Minhas Vagas</h2>
+              <Button
+                onClick={() => setShowJobForm(true)}
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-2xl"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Nova Vaga
               </Button>
             </div>
 
-            {jobs.length === 0 ? (
-              <Card className="border-0 shadow-lg rounded-3xl">
-                <CardContent className="p-12 text-center">
-                  <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-2xl font-bold text-gray-700 mb-2">Nenhuma vaga cadastrada</h3>
-                  <p className="text-gray-500 mb-6">
-                    Comece criando sua primeira vaga para atrair os melhores talentos.
-                  </p>
-                  <Button 
-                    onClick={handleCreateJob}
-                    className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Criar Primeira Vaga
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {jobs.map((job) => (
-                  <Card key={job.id} className="border-0 shadow-lg rounded-3xl hover:shadow-xl transition-all duration-300">
-                    <CardHeader className="bg-gradient-to-br from-gray-50 to-green-50 rounded-t-3xl">
+            {showJobForm && (
+              <div className="mb-6">
+                <JobForm
+                  job={editingJob}
+                  onSave={handleJobSaved}
+                  onCancel={() => {
+                    setShowJobForm(false);
+                    setEditingJob(null);
+                  }}
+                  companyId={company?.id || ''}
+                />
+              </div>
+            )}
+
+            <div className="grid gap-6">
+              {jobs.length === 0 ? (
+                <Card className="border-0 rounded-3xl shadow-lg">
+                  <CardContent className="p-12 text-center">
+                    <Briefcase className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-2xl font-bold text-gray-700 mb-2">Nenhuma vaga cadastrada</h3>
+                    <p className="text-gray-500 mb-6">
+                      Comece criando sua primeira vaga para atrair candidatos.
+                    </p>
+                    <Button
+                      onClick={() => setShowJobForm(true)}
+                      className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-2xl"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Criar Primeira Vaga
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                jobs.map((job) => (
+                  <Card key={job.id} className="border-0 rounded-3xl shadow-lg hover:shadow-xl transition-shadow">
+                    <CardHeader className="bg-gradient-to-r from-gray-50 to-green-50 rounded-t-3xl">
                       <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <CardTitle className="text-xl font-bold text-gray-900 mb-2">
+                        <div>
+                          <CardTitle className="text-xl font-bold text-gray-900">
                             {job.title}
                           </CardTitle>
-                          <CardDescription className="text-gray-600">
+                          <CardDescription className="text-green-600 font-medium">
                             {job.location} • {job.contract_type} • {job.work_mode}
                           </CardDescription>
                         </div>
-                        <Badge 
-                          className={`${
-                            job.status === 'Ativa' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                          } rounded-full`}
-                        >
-                          {job.status}
-                        </Badge>
+                        <div className="flex space-x-2">
+                          <Badge variant={job.status === 'Ativa' ? 'default' : 'secondary'}>
+                            {job.status}
+                          </Badge>
+                        </div>
                       </div>
                     </CardHeader>
+                    
                     <CardContent className="p-6">
                       <p className="text-gray-600 mb-4 line-clamp-2">{job.description}</p>
                       
-                      <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                        <span>Salário: {job.salary}</span>
-                        <span>Criada em {new Date(job.created_at).toLocaleDateString('pt-BR')}</span>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditJob(job)}
-                          className="flex-1 rounded-xl"
-                        >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Editar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteJob(job.id)}
-                          className="text-red-600 border-red-200 hover:bg-red-50 rounded-xl"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Excluir
-                        </Button>
+                      <div className="flex justify-between items-center">
+                        <div className="text-lg font-bold text-green-600">
+                          {job.salary}
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditJob(job)}
+                            className="rounded-xl"
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Editar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteJob(job.id)}
+                            className="rounded-xl text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Excluir
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
-            )}
+                ))
+              )}
+            </div>
           </TabsContent>
 
-          {/* Applications Tab */}
-          <TabsContent value="applications" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Candidaturas Recebidas</h2>
+          <TabsContent value="candidates" className="space-y-6">
+            <CandidatesList companyId={company?.id || ''} />
+          </TabsContent>
 
-            {applications.length === 0 ? (
-              <Card className="border-0 shadow-lg rounded-3xl">
-                <CardContent className="p-12 text-center">
-                  <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-2xl font-bold text-gray-700 mb-2">Nenhuma candidatura</h3>
-                  <p className="text-gray-500">
-                    Quando alguém se candidatar às suas vagas, aparecerá aqui.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {applications.map((application) => (
-                  <Card key={application.id} className="border-0 shadow-lg rounded-2xl hover:shadow-xl transition-all duration-300">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-bold text-gray-900">{application.name}</h3>
-                            <Badge className={`${getStatusColor(application.status)} rounded-full flex items-center gap-1`}>
-                              {getStatusIcon(application.status)}
-                              {application.status}
-                            </Badge>
-                          </div>
-                          <p className="text-gray-600 mb-1">
-                            <strong>Vaga:</strong> {application.jobs?.title}
-                          </p>
-                          <p className="text-gray-600 mb-1">
-                            <strong>Email:</strong> {application.email}
-                          </p>
-                          <p className="text-gray-600 mb-1">
-                            <strong>Telefone:</strong> {application.phone}
-                          </p>
-                          {application.experience_years && (
-                            <p className="text-gray-600 mb-1">
-                              <strong>Experiência:</strong> {application.experience_years} anos
-                            </p>
-                          )}
-                          <p className="text-sm text-gray-500">
-                            Candidatura enviada em {new Date(application.created_at).toLocaleDateString('pt-BR')}
-                          </p>
+          <TabsContent value="profile" className="space-y-6">
+            <CompanyProfileEdit />
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-6">
+            <Card className="border-0 rounded-3xl shadow-2xl">
+              <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-3xl">
+                <CardTitle className="text-2xl font-bold flex items-center">
+                  <Settings className="h-8 w-8 mr-3" />
+                  Configurações da Conta
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-8">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Informações da Conta</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Email</label>
+                        <div className="mt-1 p-3 bg-gray-50 rounded-xl">
+                          {user?.email}
                         </div>
-                        <Button
-                          onClick={() => setSelectedApplication(application)}
-                          className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl"
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Ver Detalhes
-                        </Button>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Status da Conta</label>
+                        <div className="mt-1">
+                          <Badge variant={company?.status === 'Ativa' ? 'default' : 'secondary'}>
+                            {company?.status || 'Pendente'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-semibold mb-4">Ações da Conta</h3>
+                    <div className="space-y-3">
+                      <Button
+                        variant="outline"
+                        onClick={handleSignOut}
+                        className="w-full justify-start rounded-xl"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Sair da Conta
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* Job Form Modal */}
-      {showJobForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <JobForm
-              job={editingJob}
-              onSave={handleJobSaved}
-              onCancel={() => setShowJobForm(false)}
-              companyId={company.id}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Application Details Modal */}
-      {selectedApplication && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <ApplicationDetails
-              application={selectedApplication}
-              onClose={() => setSelectedApplication(null)}
-              onStatusUpdate={fetchApplications}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 };

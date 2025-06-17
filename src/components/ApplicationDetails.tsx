@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +25,7 @@ const ApplicationDetails: React.FC<ApplicationDetailsProps> = ({
   onStatusUpdate,
   onClose
 }) => {
-  const [status, setStatus] = useState(application.status);
+  const [status, setStatus] = useState<Database['public']['Enums']['application_status']>(application.status);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -37,7 +36,7 @@ const ApplicationDetails: React.FC<ApplicationDetailsProps> = ({
       const { error } = await supabase
         .from('applications')
         .update({ 
-          status: status as any,
+          status: status,
           updated_at: new Date().toISOString()
         })
         .eq('id', application.id);
@@ -226,7 +225,7 @@ const ApplicationDetails: React.FC<ApplicationDetailsProps> = ({
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="status">Novo Status</Label>
-                <Select value={status} onValueChange={setStatus}>
+                <Select value={status} onValueChange={(value: Database['public']['Enums']['application_status']) => setStatus(value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>

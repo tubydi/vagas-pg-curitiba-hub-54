@@ -112,13 +112,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Attempting sign up for:', email);
       
-      // Criar usuário COM confirmação automática
+      // Criar usuário SEM confirmação de email - usando service role key internamente
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          // NÃO enviar email de confirmação
-          emailRedirectTo: undefined,
+          // Não definir emailRedirectTo para evitar envio de email
           data: {
             company_name: companyData?.companyName || '',
             cnpj: companyData?.cnpj || ''
@@ -147,19 +146,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data.user) {
         console.log('User created successfully:', data.user.id);
-        
-        // Confirmar email automaticamente usando service role
-        try {
-          const { error: confirmError } = await supabase.rpc('confirm_user_email', {
-            user_id: data.user.id
-          });
-          
-          if (confirmError) {
-            console.log('RPC confirm error, trying direct update:', confirmError);
-          }
-        } catch (rpcError) {
-          console.log('RPC not available, user should be auto-confirmed');
-        }
         
         // Criar dados da empresa
         if (companyData) {

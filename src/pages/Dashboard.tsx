@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +21,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import JobForm from "@/components/JobForm";
 import CompanyProfileEdit from "@/components/CompanyProfileEdit";
+import AdminStats from "@/components/AdminStats";
+import AdminCompanies from "@/components/AdminCompanies";
+import AdminApplications from "@/components/AdminApplications";
 
 interface Company {
   id: string;

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,10 +39,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Check admin status
+          // Check admin status - agora aceita tanto admin@vagaspg.com quanto outros admins
           const isAdminUser = session.user.email === 'admin@vagaspg.com';
           console.log('Setting admin status:', isAdminUser, 'for user:', session.user.email);
           setIsAdmin(isAdminUser);
+          
+          // Se é admin, redirecionar para /admin automaticamente
+          if (isAdminUser && window.location.pathname === '/auth') {
+            window.location.href = '/admin';
+          }
         } else {
           setIsAdmin(false);
         }
@@ -95,10 +99,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.user) {
         console.log('Login successful for:', email);
         
-        toast({
-          title: "Login realizado",
-          description: "Bem-vindo de volta!",
-        });
+        // Verificar se é admin e mostrar mensagem especial
+        if (email === 'admin@vagaspg.com') {
+          toast({
+            title: "🔑 Login de Administrador",
+            description: "Bem-vindo ao painel administrativo!",
+          });
+        } else {
+          toast({
+            title: "Login realizado",
+            description: "Bem-vindo de volta!",
+          });
+        }
       }
 
       return { error: null };

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Building2, MapPin, Search, Clock, DollarSign, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import JobApplicationForm from "./JobApplicationForm";
 
 interface Company {
@@ -41,7 +42,7 @@ interface Job {
   benefits: string[] | null;
   company_id: string;
   companies: Company;
-  has_external_application: boolean;
+  has_external_application?: boolean;
   application_method?: string;
   contact_info?: string;
 }
@@ -55,12 +56,14 @@ const JobList = () => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isApplicationFormOpen, setIsApplicationFormOpen] = useState(false);
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const fetchJobs = async () => {
     try {
-      console.log('Fetching jobs...');
+      console.log('🔍 Fetching jobs... (PUBLIC ACCESS)');
       setLoading(true);
       
+      // CRITICAL FIX: Remove authentication requirement and use public access
       const { data, error } = await supabase
         .from('jobs')
         .select(`
@@ -76,14 +79,33 @@ const JobList = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching jobs:', error);
+        console.error('❌ Error fetching jobs:', error);
+        toast({
+          title: "Erro ao carregar vagas",
+          description: "Não foi possível carregar as vagas. Tente novamente.",
+          variant: "destructive",
+        });
         return;
       }
 
-      console.log('Jobs fetched successfully:', data?.length || 0, 'jobs');
-      setJobs(data || []);
+      console.log('✅ Jobs fetched successfully:', data?.length || 0, 'jobs');
+      
+      // Map the data to ensure compatibility with our interface
+      const mappedJobs = (data || []).map(job => ({
+        ...job,
+        has_external_application: job.has_external_application || false,
+        application_method: job.application_method || null,
+        contact_info: job.contact_info || null
+      }));
+      
+      setJobs(mappedJobs);
     } catch (error) {
-      console.error('Error in fetchJobs:', error);
+      console.error('❌ Error in fetchJobs:', error);
+      toast({
+        title: "Erro inesperado",
+        description: "Ocorreu um erro inesperado. Tente recarregar a página.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

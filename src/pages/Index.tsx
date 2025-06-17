@@ -53,9 +53,10 @@ const Index = () => {
 
   const fetchFeaturedJobs = async () => {
     try {
-      console.log('Fetching featured jobs...');
+      console.log('🔍 Fetching featured jobs... (PUBLIC ACCESS)');
       setLoading(true);
       
+      // CRITICAL FIX: Remove authentication dependency and ensure public access
       const { data, error } = await supabase
         .from('jobs')
         .select(`
@@ -72,14 +73,23 @@ const Index = () => {
         .limit(6);
 
       if (error) {
-        console.error('Error fetching featured jobs:', error);
+        console.error('❌ Error fetching featured jobs:', error);
         return;
       }
 
-      console.log('Featured jobs fetched successfully:', data?.length || 0, 'jobs');
-      setFeaturedJobs(data || []);
+      console.log('✅ Featured jobs fetched successfully:', data?.length || 0, 'jobs');
+      
+      // Map the data to ensure compatibility
+      const mappedJobs = (data || []).map(job => ({
+        ...job,
+        has_external_application: job.has_external_application || false,
+        application_method: job.application_method || null,
+        contact_info: job.contact_info || null
+      }));
+      
+      setFeaturedJobs(mappedJobs);
     } catch (error) {
-      console.error('Error in fetchFeaturedJobs:', error);
+      console.error('❌ Error in fetchFeaturedJobs:', error);
     } finally {
       setLoading(false);
     }

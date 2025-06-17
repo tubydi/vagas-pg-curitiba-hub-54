@@ -107,10 +107,16 @@ const JobList = () => {
       job.companies.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.description.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Fix: Melhor lógica de filtro por cidade
+    // Filtro específico para Ponta Grossa e Curitiba
     const matchesCity = selectedCity === "all" || 
-      job.location.toLowerCase().includes(selectedCity.toLowerCase()) ||
-      job.companies.city.toLowerCase().includes(selectedCity.toLowerCase());
+      (selectedCity === "ponta grossa" && (
+        job.location.toLowerCase().includes("ponta grossa") ||
+        job.companies.city.toLowerCase().includes("ponta grossa")
+      )) ||
+      (selectedCity === "curitiba" && (
+        job.location.toLowerCase().includes("curitiba") ||
+        job.companies.city.toLowerCase().includes("curitiba")
+      ));
     
     const matchesContract = selectedContract === "all" || 
       job.contract_type === selectedContract;
@@ -148,7 +154,7 @@ const JobList = () => {
             Todas as Vagas
           </h1>
           <p className="text-lg md:text-xl text-gray-600">
-            Encontre sua oportunidade ideal em Ponta Grossa e região
+            Encontre sua oportunidade ideal em Ponta Grossa e Curitiba
           </p>
         </div>
 
@@ -174,10 +180,6 @@ const JobList = () => {
                   <SelectItem value="all">Todas as cidades</SelectItem>
                   <SelectItem value="ponta grossa">Ponta Grossa</SelectItem>
                   <SelectItem value="curitiba">Curitiba</SelectItem>
-                  <SelectItem value="castro">Castro</SelectItem>
-                  <SelectItem value="carambeí">Carambeí</SelectItem>
-                  <SelectItem value="tibagi">Tibagi</SelectItem>
-                  <SelectItem value="palmeira">Palmeira</SelectItem>
                 </SelectContent>
               </Select>
 

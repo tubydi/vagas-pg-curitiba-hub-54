@@ -84,16 +84,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         console.error('Sign in error:', error);
         
-        // Verificar se é erro de email não confirmado
-        if (error.message.includes('Email not confirmed')) {
-          toast({
-            title: "Email não confirmado",
-            description: "Verifique sua caixa de entrada e clique no link de confirmação. Se não recebeu o email, tente fazer o cadastro novamente.",
-            variant: "destructive",
-          });
-          return { error };
-        }
-        
         toast({
           title: "Erro no login",
           description: error.message === 'Invalid login credentials' 
@@ -122,17 +112,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Attempting sign up for:', email);
       
-      // Use the current domain instead of localhost
-      const currentDomain = window.location.origin;
-      const redirectUrl = `${currentDomain}/auth`;
-      
-      console.log('Using redirect URL:', redirectUrl);
-      
+      // Criar usuário sem confirmação de email
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: redirectUrl,
           data: {
             company_name: companyData?.companyName || '',
             cnpj: companyData?.cnpj || ''
@@ -159,12 +143,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error };
       }
 
-      // Se o usuário foi criado mas ainda não confirmou o email
-      if (data.user && !data.user.email_confirmed_at) {
+      // Usuário criado com sucesso
+      if (data.user) {
         toast({
-          title: "📧 Confirme seu email!",
-          description: `Enviamos um email de confirmação para ${email}. Verifique sua caixa de entrada (e spam) e clique no link para ativar sua conta.`,
-          duration: 10000,
+          title: "✅ Cadastro realizado!",
+          description: "Sua conta foi criada com sucesso. Você já pode fazer login!",
+          duration: 5000,
         });
         
         // Criar dados da empresa após o cadastro
@@ -185,7 +169,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 sector: companyData.sector,
                 legal_representative: companyData.legalRepresentative,
                 description: companyData.description || '',
-                status: 'Pendente'
+                status: 'Aprovada' // Aprovar automaticamente
               }]);
 
             if (companyError) {

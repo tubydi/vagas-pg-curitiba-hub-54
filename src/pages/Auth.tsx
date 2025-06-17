@@ -56,11 +56,14 @@ const Auth = () => {
     }
 
     try {
+      const currentDomain = window.location.origin;
+      const redirectUrl = `${currentDomain}/auth`;
+      
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email: email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth`
+          emailRedirectTo: redirectUrl
         }
       });
 
@@ -171,7 +174,7 @@ const Auth = () => {
       console.log('Creating user account with email:', companyData.email);
 
       // Criar usuário no Supabase Auth com o EMAIL CORPORATIVO
-      const { error: authError } = await signUp(companyData.email, companyData.password);
+      const { error: authError } = await signUp(companyData.email, companyData.password, companyData);
       
       if (authError) {
         console.error('Auth error:', authError);

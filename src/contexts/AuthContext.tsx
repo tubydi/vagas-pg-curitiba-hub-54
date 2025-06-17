@@ -122,8 +122,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Attempting sign up for:', email);
       
-      // Usar uma URL mais simples para teste
-      const redirectUrl = `${window.location.origin}/auth`;
+      // Use the current domain instead of localhost
+      const currentDomain = window.location.origin;
+      const redirectUrl = `${currentDomain}/auth`;
+      
+      console.log('Using redirect URL:', redirectUrl);
       
       const { data, error } = await supabase.auth.signUp({
         email,

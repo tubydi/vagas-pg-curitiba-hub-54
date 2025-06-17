@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, MapPin, Search, Users, TrendingUp, Star, Clock, DollarSign } from "lucide-react";
+import { Building2, MapPin, Search, Users, TrendingUp, Star, Clock, DollarSign, Brain, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
@@ -88,6 +88,12 @@ const Index = () => {
               </h1>
             </div>
             <div className="flex items-center space-x-3">
+              <Link to="/vpg-ia">
+                <Button variant="outline" className="rounded-full border-green-200 hover:bg-green-50 hidden md:flex">
+                  <Brain className="w-4 h-4 mr-2" />
+                  VPG IA
+                </Button>
+              </Link>
               <Link to="/login">
                 <Button variant="outline" className="rounded-full border-green-200 hover:bg-green-50">
                   Entrar
@@ -103,26 +109,26 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-green-500 via-green-600 to-yellow-500 text-white py-16 relative overflow-hidden">
+      {/* Hero Section with Search - Moved up and made more prominent */}
+      <section className="bg-gradient-to-br from-green-500 via-green-600 to-yellow-500 text-white py-12 md:py-20 relative overflow-hidden">
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="container mx-auto px-4 text-center relative z-10">
-          <div className="animate-fade-in">
-            <h2 className="text-4xl md:text-7xl font-bold mb-6 leading-tight">
-              Encontre sua vaga
-              <span className="block text-yellow-300">
+          <div className="animate-fade-in mb-8">
+            <h2 className="text-3xl md:text-6xl font-bold mb-4 leading-tight">
+              Encontre sua vaga ideal
+              <span className="block text-yellow-300 text-2xl md:text-5xl">
                 em Ponta Grossa & Curitiba
               </span>
             </h2>
-            <p className="text-xl md:text-2xl text-green-100 mb-8 max-w-3xl mx-auto">
+            <p className="text-lg md:text-xl text-green-100 mb-6 max-w-2xl mx-auto">
               As melhores oportunidades de emprego da região estão aqui
             </p>
           </div>
 
-          {/* Search Section */}
-          <div className="max-w-4xl mx-auto animate-slide-up">
+          {/* Search Section - More prominent */}
+          <div className="max-w-5xl mx-auto animate-slide-up mb-8">
             <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md rounded-3xl">
-              <CardContent className="p-8">
+              <CardContent className="p-6 md:p-8">
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1 relative">
                     <Search className="absolute left-4 top-4 h-5 w-5 text-gray-400" />
@@ -150,14 +156,55 @@ const Index = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Quick stats - smaller and less prominent */}
+          <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto text-center">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4">
+              <div className="text-2xl font-bold">150+</div>
+              <div className="text-sm text-green-100">Empresas</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4">
+              <div className="text-2xl font-bold">2.5k+</div>
+              <div className="text-sm text-green-100">Candidatos</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4">
+              <div className="text-2xl font-bold">500+</div>
+              <div className="text-sm text-green-100">Vagas</div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Featured Jobs - Agora em destaque */}
-      <section className="py-20 bg-gradient-to-br from-white to-green-50 relative">
+      {/* VPG IA Banner - New section */}
+      <section className="py-8 bg-gradient-to-r from-gray-900 via-green-900 to-gray-900 text-white">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h3 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent mb-4">
+          <div className="flex flex-col md:flex-row items-center justify-between max-w-4xl mx-auto">
+            <div className="flex items-center space-x-4 mb-4 md:mb-0">
+              <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 p-3 rounded-2xl">
+                <Brain className="h-8 w-8 text-gray-900" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-yellow-300">VPG IA</h3>
+                <p className="text-gray-300">Inteligência Artificial para seu sucesso profissional</p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link to="/vpg-ia">
+                <Button size="lg" className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-gray-900 px-6 py-3 text-lg font-bold rounded-2xl shadow-lg">
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Experimentar Grátis
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Jobs - Now the main focus */}
+      <section className="py-12 md:py-20 bg-gradient-to-br from-white to-green-50 relative">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h3 className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent mb-4">
               Vagas em Destaque
             </h3>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
@@ -165,7 +212,7 @@ const Index = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
             {featuredJobs.map((job, index) => (
               <Card key={job.id} className="group hover:shadow-2xl transition-all duration-500 border-0 bg-white rounded-3xl overflow-hidden animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
                 <CardHeader className="bg-gradient-to-br from-gray-50 to-green-50 pb-4">
@@ -179,7 +226,7 @@ const Index = () => {
                       </CardDescription>
                     </div>
                     {job.featured && (
-                      <Badge className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-900 border-0 rounded-full px-3 py-1">
+                      <Badge className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-900 border-0 rounded-full px-3 py-1 shrink-0">
                         <Star className="w-3 h-3 mr-1" />
                         Destaque
                       </Badge>
@@ -196,18 +243,22 @@ const Index = () => {
                   <p className="text-gray-600 mb-6 line-clamp-2">{job.description}</p>
                   
                   <div className="space-y-4">
-                    <div className="flex items-center text-gray-700">
-                      <MapPin className="w-5 h-5 mr-3 text-green-500" />
-                      <span className="font-medium">{job.location}</span>
-                      <Badge variant="outline" className="ml-auto rounded-full">
+                    <div className="flex items-center justify-between text-gray-700">
+                      <div className="flex items-center">
+                        <MapPin className="w-5 h-5 mr-2 text-green-500" />
+                        <span className="font-medium">{job.location}</span>
+                      </div>
+                      <Badge variant="outline" className="rounded-full">
                         {job.workMode}
                       </Badge>
                     </div>
                     
-                    <div className="flex items-center text-gray-700">
-                      <DollarSign className="w-5 h-5 mr-3 text-green-500" />
-                      <span className="font-bold text-lg text-green-600">{job.salary}</span>
-                      <Badge variant="outline" className="ml-auto rounded-full">
+                    <div className="flex items-center justify-between text-gray-700">
+                      <div className="flex items-center">
+                        <DollarSign className="w-5 h-5 mr-2 text-green-500" />
+                        <span className="font-bold text-lg text-green-600">{job.salary}</span>
+                      </div>
+                      <Badge variant="outline" className="rounded-full">
                         {job.type}
                       </Badge>
                     </div>
@@ -236,53 +287,29 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Stats Section - Movida para baixo */}
-      <section className="py-16 bg-gradient-to-r from-green-600 to-green-700 text-white">
-        <div className="container mx-auto px-4">
-          <h3 className="text-3xl font-bold text-center mb-12 text-yellow-300">
-            Números que Impressionam
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            <div className="animate-fade-in bg-white/10 backdrop-blur-md rounded-3xl p-8">
-              <div className="bg-yellow-400 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-                <Building2 className="h-10 w-10 text-green-800" />
-              </div>
-              <h4 className="text-4xl font-bold mb-3">150+</h4>
-              <p className="text-green-100 text-lg">Empresas Cadastradas</p>
-            </div>
-            <div className="animate-fade-in bg-white/10 backdrop-blur-md rounded-3xl p-8" style={{ animationDelay: "0.2s" }}>
-              <div className="bg-yellow-400 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-                <Users className="h-10 w-10 text-green-800" />
-              </div>
-              <h4 className="text-4xl font-bold mb-3">2.500+</h4>
-              <p className="text-green-100 text-lg">Candidatos Ativos</p>
-            </div>
-            <div className="animate-fade-in bg-white/10 backdrop-blur-md rounded-3xl p-8" style={{ animationDelay: "0.4s" }}>
-              <div className="bg-yellow-400 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-                <TrendingUp className="h-10 w-10 text-green-800" />
-              </div>
-              <h4 className="text-4xl font-bold mb-3">500+</h4>
-              <p className="text-green-100 text-lg">Vagas Publicadas</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* CTA Section for Companies */}
-      <section className="py-20 bg-gradient-to-br from-gray-900 via-green-900 to-gray-900 text-white relative overflow-hidden">
+      <section className="py-16 bg-gradient-to-br from-gray-900 via-green-900 to-gray-900 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 to-yellow-600/20"></div>
         <div className="container mx-auto px-4 text-center relative z-10">
-          <h3 className="text-4xl md:text-5xl font-bold mb-6">
+          <h3 className="text-3xl md:text-4xl font-bold mb-6">
             Sua empresa precisa de talentos?
           </h3>
           <p className="text-xl text-gray-300 mb-10 max-w-3xl mx-auto">
             Publique suas vagas e encontre os melhores profissionais de Ponta Grossa e Curitiba.
           </p>
-          <Link to="/register">
-            <Button size="lg" className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-gray-900 px-12 py-4 text-xl font-bold rounded-full shadow-2xl transform hover:scale-105 transition-all duration-200">
-              Cadastrar Empresa Gratuitamente
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Link to="/register">
+              <Button size="lg" className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-gray-900 px-8 py-4 text-xl font-bold rounded-full shadow-2xl">
+                Cadastrar Empresa Gratuitamente
+              </Button>
+            </Link>
+            <Link to="/vpg-ia">
+              <Button size="lg" variant="outline" className="text-white border-white hover:bg-white hover:text-gray-900 px-8 py-4 text-xl font-bold rounded-full">
+                <Brain className="w-5 h-5 mr-2" />
+                Usar VPG IA
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 

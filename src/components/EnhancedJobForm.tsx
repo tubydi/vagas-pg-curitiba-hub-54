@@ -1,365 +1,460 @@
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { X, Sparkles } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Database } from "@/integrations/supabase/types";
+import { supabase } from "@/integrations/supabase/client";
+import { Briefcase, X, Sparkles } from "lucide-react";
+import type { Database } from "@/integrations/supabase/types";
 import AIJobExtractor from "./AIJobExtractor";
 
-type ContractType = Database["public"]["Enums"]["contract_type"];
-type WorkMode = Database["public"]["Enums"]["work_mode"];
-type ExperienceLevel = Database["public"]["Enums"]["experience_level"];
+type JobStatus = Database['public']['Enums']['job_status'];
+type ContractType = Database['public']['Enums']['contract_type'];
+type WorkMode = Database['public']['Enums']['work_mode'];
+type ExperienceLevel = Database['public']['Enums']['experience_level'];
+
+interface Job {
+  id?: string;
+  title: string;
+  description: string;
+  requirements: string;
+  salary: string;
+  location: string;
+  contract_type: ContractType;
+  work_mode: WorkMode;
+  experience_level: ExperienceLevel;
+  benefits: string[];
+  status?: JobStatus;
+  company_id: string;
+}
 
 interface EnhancedJobFormProps {
-  job?: any;
+  job?: Job | null;
   onSave: () => void;
   onCancel: () => void;
   companyId: string;
 }
 
 const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormProps) => {
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [showAIExtractor, setShowAIExtractor] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Job>({
     title: "",
     description: "",
     requirements: "",
     salary: "",
     location: "",
-    contract_type: "" as ContractType,
-    work_mode: "" as WorkMode,
-    experience_level: "" as ExperienceLevel
+    contract_type: "CLT" as ContractType,
+    work_mode: "Presencial" as WorkMode,
+    experience_level: "Júnior" as ExperienceLevel,
+    benefits: [],
+    company_id: companyId,
   });
 
-  const [benefitsList, setBenefitsList] = useState<string[]>([]);
   const [newBenefit, setNewBenefit] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAIExtractor, setShowAIExtractor] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (job) {
-      setFormData({
-        title: job.title || "",
-        description: job.description || "",
-        requirements: job.requirements || "",
-        salary: job.salary || "",
-        location: job.location || "",
-        contract_type: job.contract_type || "" as ContractType,
-        work_mode: job.work_mode || "" as WorkMode,
-        experience_level: job.experience_level || "" as ExperienceLevel
-      });
-      setBenefitsList(job.benefits || []);
+      setFormData(job);
     }
   }, [job]);
 
-  const handleAIExtractedData = (extractedData: any) => {
-    console.log('🤖 Dados extraídos pela IA:', extractedData);
+  const validateField = (text: string): string[] => {
+    const errors: string[] = [];
     
-    // Update form data with extracted information
-    setFormData({
-      title: extractedData.title || "",
-      description: extractedData.description || "",
-      requirements: extractedData.requirements || "",
-      salary: extractedData.salary || "",
-      location: extractedData.location || "Ponta Grossa",
-      contract_type: extractedData.contract_type || "CLT" as ContractType,
-      work_mode: extractedData.work_mode || "Presencial" as WorkMode,
-      experience_level: extractedData.experience_level || "Júnior" as ExperienceLevel
-    });
-
-    // Update benefits if provided
-    if (extractedData.benefits && Array.isArray(extractedData.benefits)) {
-      setBenefitsList(extractedData.benefits.filter(Boolean));
+    // Verificar emojis problemáticos
+    const emojiRegex = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu;
+    if (emojiRegex.test(text)) {
+      errors.push("Emojis podem causar problemas. Considere removê-los.");
     }
+    
+    // Verificar caracteres especiais problemáticos
+    const problematicChars = /['""`´''""]/g;
+    if (problematicChars.test(text)) {
+      errors.push("Aspas especiais podem causar problemas. Use aspas simples (') ou duplas (\") padrão.");
+    }
+    
+    return errors;
+  };
 
-    toast({
-      title: "🎉 Preenchimento automático concluído!",
-      description: "A IA preencheu todos os campos da vaga. Revise e ajuste conforme necessário.",
+  const validateForm = (): boolean => {
+    const errors: string[] = [];
+    
+    // Validar todos os campos de texto
+    const fieldsToValidate = [
+      { field: formData.title, name: "Título" },
+      { field: formData.description, name: "Descrição" },
+      { field: formData.requirements, name: "Requisitos" },
+      { field: formData.salary, name: "Salário" },
+      { field: formData.location, name: "Localização" }
+    ];
+    
+    fieldsToValidate.forEach(({ field, name }) => {
+      const fieldErrors = validateField(field);
+      if (fieldErrors.length > 0) {
+        errors.push(`${name}: ${fieldErrors.join(", ")}`);
+      }
     });
+    
+    // Validar benefícios
+    formData.benefits.forEach((benefit, index) => {
+      const benefitErrors = validateField(benefit);
+      if (benefitErrors.length > 0) {
+        errors.push(`Benefício ${index + 1}: ${benefitErrors.join(", ")}`);
+      }
+    });
+    
+    setValidationErrors(errors);
+    return errors.length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    
+    if (!validateForm()) {
+      toast({
+        title: "❌ Problemas encontrados",
+        description: "Verifique os erros listados abaixo e corrija antes de publicar.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
 
     try {
       const jobData = {
         ...formData,
-        benefits: benefitsList,
         company_id: companyId,
-        status: 'Ativa' as const
+        updated_at: new Date().toISOString(),
       };
 
+      let result;
       if (job?.id) {
-        // Update existing job
-        const { error } = await supabase
+        // Atualizar vaga existente
+        result = await supabase
           .from('jobs')
           .update(jobData)
           .eq('id', job.id);
-
-        if (error) throw error;
-
-        toast({
-          title: "✅ Vaga atualizada",
-          description: "A vaga foi atualizada com sucesso!",
-        });
       } else {
-        // Create new job
-        const { error } = await supabase
+        // Criar nova vaga
+        result = await supabase
           .from('jobs')
-          .insert([jobData]);
-
-        if (error) throw error;
-
-        toast({
-          title: "🎉 Vaga publicada",
-          description: "A vaga foi criada e publicada com sucesso!",
-        });
+          .insert([{
+            ...jobData,
+            created_at: new Date().toISOString(),
+          }]);
       }
+
+      if (result.error) {
+        console.error('Erro ao salvar vaga:', result.error);
+        
+        // Mensagem de erro mais específica
+        let errorMessage = "Erro ao salvar vaga.";
+        if (result.error.message.includes('invalid input value for enum')) {
+          errorMessage = "Valor inválido selecionado. Verifique os campos obrigatórios.";
+        } else if (result.error.message.includes('duplicate')) {
+          errorMessage = "Já existe uma vaga com essas informações.";
+        }
+        
+        toast({
+          title: "❌ Erro",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "✅ Sucesso!",
+        description: job?.id ? "Vaga atualizada com sucesso!" : "Vaga publicada com sucesso!",
+      });
 
       onSave();
     } catch (error) {
-      console.error('Error saving job:', error);
+      console.error('Erro:', error);
       toast({
         title: "❌ Erro",
-        description: "Erro ao salvar vaga. Tente novamente.",
+        description: "Erro inesperado ao salvar vaga.",
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
   const addBenefit = () => {
-    if (newBenefit.trim() && !benefitsList.includes(newBenefit.trim())) {
-      setBenefitsList([...benefitsList, newBenefit.trim()]);
+    if (newBenefit.trim() && !formData.benefits.includes(newBenefit.trim())) {
+      const benefitErrors = validateField(newBenefit.trim());
+      if (benefitErrors.length > 0) {
+        toast({
+          title: "⚠️ Problema no benefício",
+          description: benefitErrors.join(", "),
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setFormData(prev => ({
+        ...prev,
+        benefits: [...prev.benefits, newBenefit.trim()]
+      }));
       setNewBenefit("");
     }
   };
 
-  const removeBenefit = (benefit: string) => {
-    setBenefitsList(benefitsList.filter(b => b !== benefit));
+  const removeBenefit = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      benefits: prev.benefits.filter((_, i) => i !== index)
+    }));
   };
 
-  if (showAIExtractor) {
-    return (
-      <AIJobExtractor
-        onExtractedData={handleAIExtractedData}
-        onClose={() => setShowAIExtractor(false)}
-      />
-    );
-  }
+  const handleAIExtraction = (extractedData: Partial<Job>) => {
+    setFormData(prev => ({
+      ...prev,
+      ...extractedData,
+      company_id: companyId,
+    }));
+    setShowAIExtractor(false);
+    
+    toast({
+      title: "🤖 IA aplicada!",
+      description: "Dados extraídos da imagem e preenchidos automaticamente.",
+    });
+  };
 
   return (
     <Card className="border-0 rounded-3xl shadow-2xl">
       <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-3xl">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-2xl font-bold">
-            {job ? "📝 Editar Vaga" : "🆕 Nova Vaga"}
-          </CardTitle>
+        <CardTitle className="text-xl md:text-2xl font-bold flex items-center justify-between">
+          <div className="flex items-center">
+            <Briefcase className="h-6 md:h-8 w-6 md:w-8 mr-3" />
+            {job ? "Editar Vaga" : "Nova Vaga"}
+          </div>
           <Button
-            type="button"
-            onClick={() => setShowAIExtractor(true)}
-            className="bg-purple-500 hover:bg-purple-600 text-white rounded-2xl font-semibold px-6"
+            variant="ghost"
+            onClick={() => setShowAIExtractor(!showAIExtractor)}
+            className="text-white hover:bg-white/20 rounded-xl"
+            size="sm"
           >
             <Sparkles className="w-4 h-4 mr-2" />
-            🤖 Preenchimento Automático
+            <span className="hidden md:inline">Preenchimento Automático</span>
+            <span className="md:hidden">IA</span>
           </Button>
-        </div>
-        <p className="text-green-100 mt-2">
-          💡 Use o preenchimento automático para extrair dados de uma imagem da vaga!
-        </p>
+        </CardTitle>
       </CardHeader>
-      <CardContent className="p-8">
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Informações Básicas */}
-          <div className="space-y-6">
-            <h4 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">
-              📋 Informações Básicas
-            </h4>
-            
-            <div>
-              <Label htmlFor="title" className="text-base font-semibold">Título da Vaga *</Label>
+
+      <CardContent className="p-4 md:p-8 space-y-6">
+        {/* Mostrar erros de validação */}
+        {validationErrors.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <h4 className="font-semibold text-red-800 mb-2">⚠️ Problemas encontrados:</h4>
+            <ul className="text-red-700 text-sm space-y-1">
+              {validationErrors.map((error, index) => (
+                <li key={index}>• {error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* AI Extractor */}
+        {showAIExtractor && (
+          <div className="mb-6">
+            <AIJobExtractor onExtracted={handleAIExtraction} />
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="title">Título da Vaga *</Label>
               <Input
                 id="title"
                 value={formData.title}
-                onChange={(e) => handleInputChange("title", e.target.value)}
-                required
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                 placeholder="Ex: Desenvolvedor Full Stack"
-                className="mt-2 h-12 rounded-xl"
+                required
+                className="rounded-xl"
               />
             </div>
 
-            <div>
-              <Label htmlFor="description" className="text-base font-semibold">Descrição da Vaga *</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => handleInputChange("description", e.target.value)}
+            <div className="space-y-2">
+              <Label htmlFor="salary">Salário *</Label>
+              <Input
+                id="salary"
+                value={formData.salary}
+                onChange={(e) => setFormData(prev => ({ ...prev, salary: e.target.value }))}
+                placeholder="Ex: R$ 5.000 - R$ 8.000"
                 required
-                placeholder="Descreva as principais responsabilidades e atividades..."
-                className="mt-2 h-32 rounded-xl"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="requirements" className="text-base font-semibold">Requisitos *</Label>
-              <Textarea
-                id="requirements"
-                value={formData.requirements}
-                onChange={(e) => handleInputChange("requirements", e.target.value)}
-                required
-                placeholder="Liste os requisitos técnicos e experiências necessárias..."
-                className="mt-2 h-24 rounded-xl"
+                className="rounded-xl"
               />
             </div>
           </div>
 
-          {/* Condições */}
-          <div className="space-y-6">
-            <h4 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">
-              💰 Condições da Vaga
-            </h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <Label htmlFor="salary" className="text-base font-semibold">Faixa Salarial *</Label>
-                <Input
-                  id="salary"
-                  value={formData.salary}
-                  onChange={(e) => handleInputChange("salary", e.target.value)}
-                  required
-                  placeholder="Ex: R$ 5.000 - R$ 8.000"
-                  className="mt-2 h-12 rounded-xl"
-                />
-              </div>
+          <div className="space-y-2">
+            <Label htmlFor="location">Localização *</Label>
+            <Input
+              id="location"
+              value={formData.location}
+              onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+              placeholder="Ex: São Paulo - SP"
+              required
+              className="rounded-xl"
+            />
+          </div>
 
-              <div>
-                <Label htmlFor="location" className="text-base font-semibold">Local *</Label>
-                <Select value={formData.location} onValueChange={(value) => handleInputChange("location", value)}>
-                  <SelectTrigger className="mt-2 h-12 rounded-xl">
-                    <SelectValue placeholder="Selecione a cidade" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Ponta Grossa">📍 Ponta Grossa</SelectItem>
-                    <SelectItem value="Curitiba">🏙️ Curitiba</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="contract_type">Tipo de Contrato *</Label>
+              <Select
+                value={formData.contract_type}
+                onValueChange={(value: ContractType) => 
+                  setFormData(prev => ({ ...prev, contract_type: value }))
+                }
+              >
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CLT">CLT</SelectItem>
+                  <SelectItem value="PJ">PJ</SelectItem>
+                  <SelectItem value="Freelancer">Freelancer</SelectItem>
+                  <SelectItem value="Estágio">Estágio</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <Label htmlFor="contract_type" className="text-base font-semibold">Tipo de Contrato *</Label>
-                <Select value={formData.contract_type} onValueChange={(value) => handleInputChange("contract_type", value)}>
-                  <SelectTrigger className="mt-2 h-12 rounded-xl">
-                    <SelectValue placeholder="Tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CLT">👨‍💼 CLT</SelectItem>
-                    <SelectItem value="PJ">🏢 PJ</SelectItem>
-                    <SelectItem value="Freelancer">💻 Freelancer</SelectItem>
-                    <SelectItem value="Estágio">🎓 Estágio</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="work_mode">Modalidade *</Label>
+              <Select
+                value={formData.work_mode}
+                onValueChange={(value: WorkMode) => 
+                  setFormData(prev => ({ ...prev, work_mode: value }))
+                }
+              >
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Presencial">Presencial</SelectItem>
+                  <SelectItem value="Remoto">Remoto</SelectItem>
+                  <SelectItem value="Híbrido">Híbrido</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div>
-                <Label htmlFor="work_mode" className="text-base font-semibold">Modalidade *</Label>
-                <Select value={formData.work_mode} onValueChange={(value) => handleInputChange("work_mode", value)}>
-                  <SelectTrigger className="mt-2 h-12 rounded-xl">
-                    <SelectValue placeholder="Modalidade" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Presencial">🏢 Presencial</SelectItem>
-                    <SelectItem value="Remoto">🏠 Remoto</SelectItem>
-                    <SelectItem value="Híbrido">🔄 Híbrido</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="experience_level" className="text-base font-semibold">Experiência *</Label>
-                <Select value={formData.experience_level} onValueChange={(value) => handleInputChange("experience_level", value)}>
-                  <SelectTrigger className="mt-2 h-12 rounded-xl">
-                    <SelectValue placeholder="Nível" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Estagiário">📚 Estagiário</SelectItem>
-                    <SelectItem value="Júnior">🌱 Júnior</SelectItem>
-                    <SelectItem value="Pleno">⚖️ Pleno</SelectItem>
-                    <SelectItem value="Sênior">🎯 Sênior</SelectItem>
-                    <SelectItem value="Especialista">🏆 Especialista</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="experience_level">Experiência *</Label>
+              <Select
+                value={formData.experience_level}
+                onValueChange={(value: ExperienceLevel) => 
+                  setFormData(prev => ({ ...prev, experience_level: value }))
+                }
+              >
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Estagiário">Estagiário</SelectItem>
+                  <SelectItem value="Júnior">Júnior</SelectItem>
+                  <SelectItem value="Pleno">Pleno</SelectItem>
+                  <SelectItem value="Sênior">Sênior</SelectItem>
+                  <SelectItem value="Especialista">Especialista</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          {/* Benefícios */}
-          <div className="space-y-6">
-            <h4 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">
-              🎁 Benefícios
-            </h4>
-            
-            <div className="flex gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="description">Descrição da Vaga *</Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Descreva as responsabilidades e o que a empresa oferece..."
+              className="min-h-[120px] rounded-xl"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="requirements">Requisitos *</Label>
+            <Textarea
+              id="requirements"
+              value={formData.requirements}
+              onChange={(e) => setFormData(prev => ({ ...prev, requirements: e.target.value }))}
+              placeholder="Liste os requisitos técnicos e experiências necessárias..."
+              className="min-h-[120px] rounded-xl"
+              required
+            />
+          </div>
+
+          <div className="space-y-4">
+            <Label>Benefícios</Label>
+            <div className="flex flex-col md:flex-row gap-2">
               <Input
                 value={newBenefit}
                 onChange={(e) => setNewBenefit(e.target.value)}
                 placeholder="Ex: Vale refeição, Plano de saúde..."
+                className="flex-1 rounded-xl"
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addBenefit())}
-                className="h-12 rounded-xl"
               />
-              <Button type="button" onClick={addBenefit} variant="outline" className="rounded-xl px-6">
+              <Button
+                type="button"
+                onClick={addBenefit}
+                variant="outline"
+                className="rounded-xl"
+              >
                 Adicionar
               </Button>
             </div>
-
-            {benefitsList.length > 0 && (
-              <Card className="rounded-2xl border-green-100">
-                <CardContent className="p-6">
-                  <div className="flex flex-wrap gap-3">
-                    {benefitsList.map((benefit, index) => (
-                      <Badge key={index} variant="secondary" className="flex items-center gap-2 bg-green-100 text-green-800 hover:bg-green-200 rounded-full px-3 py-1">
-                        {benefit}
-                        <X 
-                          className="w-4 h-4 cursor-pointer hover:text-red-500" 
-                          onClick={() => removeBenefit(benefit)}
-                        />
-                      </Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            
+            <div className="flex flex-wrap gap-2">
+              {formData.benefits.map((benefit, index) => (
+                <Badge
+                  key={index}
+                  variant="secondary"
+                  className="rounded-full px-3 py-1 text-sm"
+                >
+                  {benefit}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeBenefit(index)}
+                    className="ml-2 h-4 w-4 p-0 hover:bg-transparent"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </Badge>
+              ))}
+            </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-4 pt-6">
-            <Button 
-              type="submit" 
-              disabled={loading}
-              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white flex-1 h-12 rounded-2xl font-semibold text-lg"
+          <div className="flex flex-col md:flex-row gap-4 pt-6">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-2xl h-12 font-semibold text-lg flex-1"
             >
-              {loading ? "⏳ Salvando..." : (job ? "📝 Atualizar Vaga" : "🚀 Publicar Vaga")}
+              {isSubmitting ? "Salvando..." : (job ? "💾 Atualizar Vaga" : "🚀 Publicar Vaga")}
             </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onCancel} 
-              className="flex-1 h-12 rounded-2xl font-semibold"
+            
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              className="rounded-2xl h-12 font-semibold text-lg flex-1 md:flex-none md:w-32"
             >
-              ❌ Cancelar
+              Cancelar
             </Button>
           </div>
         </form>

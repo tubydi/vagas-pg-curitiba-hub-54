@@ -13,6 +13,9 @@ import { Briefcase, Search, Edit, Trash2, CheckCircle, XCircle, Eye, Pause } fro
 import type { Database } from "@/integrations/supabase/types";
 
 type JobStatus = Database['public']['Enums']['job_status'];
+type ContractType = Database['public']['Enums']['contract_type'];
+type WorkMode = Database['public']['Enums']['work_mode'];
+type ExperienceLevel = Database['public']['Enums']['experience_level'];
 
 interface Job {
   id: string;
@@ -21,9 +24,9 @@ interface Job {
   requirements: string;
   salary: string;
   location: string;
-  contract_type: string;
-  work_mode: string;
-  experience_level: string;
+  contract_type: ContractType;
+  work_mode: WorkMode;
+  experience_level: ExperienceLevel;
   benefits: string[];
   status: JobStatus;
   created_at: string;
@@ -32,6 +35,20 @@ interface Job {
   companies: {
     name: string;
   };
+}
+
+interface JobUpdateData {
+  title?: string;
+  description?: string;
+  requirements?: string;
+  salary?: string;
+  location?: string;
+  contract_type?: ContractType;
+  work_mode?: WorkMode;
+  experience_level?: ExperienceLevel;
+  benefits?: string[];
+  status?: JobStatus;
+  updated_at?: string;
 }
 
 const AdminJobsTable = () => {
@@ -81,7 +98,10 @@ const AdminJobsTable = () => {
       console.log('ADMIN: Alterando status da vaga:', jobId, 'para:', newStatus);
       const { error } = await supabase
         .from('jobs')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update({ 
+          status: newStatus, 
+          updated_at: new Date().toISOString() 
+        } satisfies JobUpdateData)
         .eq('id', jobId);
 
       if (error) {
@@ -138,12 +158,18 @@ const AdminJobsTable = () => {
     }
   };
 
-  const updateJob = async (jobId: string, updates: Partial<Job>) => {
+  const updateJob = async (jobId: string, updates: JobUpdateData) => {
     try {
       console.log('ADMIN: Atualizando vaga:', jobId);
+      
+      const updateData: JobUpdateData = {
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
+
       const { error } = await supabase
         .from('jobs')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(updateData)
         .eq('id', jobId);
 
       if (error) {
@@ -190,7 +216,7 @@ const AdminJobsTable = () => {
         return "bg-green-100 text-green-800";
       case "Pausada":
         return "bg-yellow-100 text-yellow-800";
-      case "Finalizada":
+      case "Fechada":
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
@@ -229,7 +255,7 @@ const AdminJobsTable = () => {
               <SelectItem value="all">Todos os status</SelectItem>
               <SelectItem value="Ativa">Ativa</SelectItem>
               <SelectItem value="Pausada">Pausada</SelectItem>
-              <SelectItem value="Finalizada">Finalizada</SelectItem>
+              <SelectItem value="Fechada">Fechada</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -247,160 +273,168 @@ const AdminJobsTable = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Vaga</TableHead>
-                <TableHead>Empresa</TableHead>
-                <TableHead>Local</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Criada</TableHead>
-                <TableHead>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredJobs.map((job) => (
-                <TableRow key={job.id}>
-                  <TableCell className="font-medium">{job.title}</TableCell>
-                  <TableCell>{job.companies.name}</TableCell>
-                  <TableCell>{job.location}</TableCell>
-                  <TableCell>
-                    <Badge className={`${getStatusColor(job.status)} rounded-full px-3 py-1 font-semibold`}>
-                      {job.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{new Date(job.created_at).toLocaleDateString('pt-BR')}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setSelectedJob(job)}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                              <Briefcase className="h-6 w-6 text-blue-500" />
-                              {job.title} - {job.companies.name}
-                            </DialogTitle>
-                          </DialogHeader>
-                          
-                          {selectedJob && (
-                            <div className="space-y-6">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <h4 className="font-semibold text-gray-900">Informações Básicas</h4>
-                                  <div className="space-y-2 mt-2">
-                                    <p><strong>Cargo:</strong> {selectedJob.title}</p>
-                                    <p><strong>Empresa:</strong> {selectedJob.companies.name}</p>
-                                    <p><strong>Local:</strong> {selectedJob.location}</p>
-                                    <p><strong>Salário:</strong> {selectedJob.salary}</p>
-                                    <p><strong>Tipo:</strong> {selectedJob.contract_type}</p>
-                                    <p><strong>Modalidade:</strong> {selectedJob.work_mode}</p>
-                                    <p><strong>Experiência:</strong> {selectedJob.experience_level}</p>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[200px]">Vaga</TableHead>
+                  <TableHead className="min-w-[150px]">Empresa</TableHead>
+                  <TableHead className="min-w-[120px]">Local</TableHead>
+                  <TableHead className="min-w-[100px]">Status</TableHead>
+                  <TableHead className="min-w-[120px]">Criada</TableHead>
+                  <TableHead className="min-w-[120px]">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredJobs.map((job) => (
+                  <TableRow key={job.id}>
+                    <TableCell className="font-medium">{job.title}</TableCell>
+                    <TableCell>{job.companies.name}</TableCell>
+                    <TableCell>{job.location}</TableCell>
+                    <TableCell>
+                      <Badge className={`${getStatusColor(job.status)} rounded-full px-3 py-1 font-semibold`}>
+                        {job.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{new Date(job.created_at).toLocaleDateString('pt-BR')}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setSelectedJob(job)}
+                              className="min-w-[40px]"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                            <DialogHeader>
+                              <DialogTitle className="flex items-center gap-2">
+                                <Briefcase className="h-6 w-6 text-blue-500" />
+                                {job.title} - {job.companies.name}
+                              </DialogTitle>
+                            </DialogHeader>
+                            
+                            {selectedJob && (
+                              <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <h4 className="font-semibold text-gray-900">Informações Básicas</h4>
+                                    <div className="space-y-2 mt-2">
+                                      <p><strong>Cargo:</strong> {selectedJob.title}</p>
+                                      <p><strong>Empresa:</strong> {selectedJob.companies.name}</p>
+                                      <p><strong>Local:</strong> {selectedJob.location}</p>
+                                      <p><strong>Salário:</strong> {selectedJob.salary}</p>
+                                      <p><strong>Tipo:</strong> {selectedJob.contract_type}</p>
+                                      <p><strong>Modalidade:</strong> {selectedJob.work_mode}</p>
+                                      <p><strong>Experiência:</strong> {selectedJob.experience_level}</p>
+                                    </div>
+                                  </div>
+                                  
+                                  <div>
+                                    <h4 className="font-semibold text-gray-900">Status e Datas</h4>
+                                    <div className="space-y-2 mt-2">
+                                      <p><strong>Status:</strong> 
+                                        <Badge className={`ml-2 ${getStatusColor(selectedJob.status)}`}>
+                                          {selectedJob.status}
+                                        </Badge>
+                                      </p>
+                                      <p><strong>Criada:</strong> {new Date(selectedJob.created_at).toLocaleDateString('pt-BR')}</p>
+                                      <p><strong>Atualizada:</strong> {new Date(selectedJob.updated_at).toLocaleDateString('pt-BR')}</p>
+                                    </div>
                                   </div>
                                 </div>
-                                
+
                                 <div>
-                                  <h4 className="font-semibold text-gray-900">Status e Datas</h4>
-                                  <div className="space-y-2 mt-2">
-                                    <p><strong>Status:</strong> 
-                                      <Badge className={`ml-2 ${getStatusColor(selectedJob.status)}`}>
-                                        {selectedJob.status}
-                                      </Badge>
-                                    </p>
-                                    <p><strong>Criada:</strong> {new Date(selectedJob.created_at).toLocaleDateString('pt-BR')}</p>
-                                    <p><strong>Atualizada:</strong> {new Date(selectedJob.updated_at).toLocaleDateString('pt-BR')}</p>
-                                  </div>
+                                  <h4 className="font-semibold text-gray-900">Descrição</h4>
+                                  <p className="mt-2 text-gray-700 bg-gray-50 p-4 rounded-lg whitespace-pre-wrap">{selectedJob.description}</p>
                                 </div>
-                              </div>
 
-                              <div>
-                                <h4 className="font-semibold text-gray-900">Descrição</h4>
-                                <p className="mt-2 text-gray-700 bg-gray-50 p-4 rounded-lg">{selectedJob.description}</p>
-                              </div>
-
-                              <div>
-                                <h4 className="font-semibold text-gray-900">Requisitos</h4>
-                                <p className="mt-2 text-gray-700 bg-gray-50 p-4 rounded-lg">{selectedJob.requirements}</p>
-                              </div>
-
-                              {selectedJob.benefits && selectedJob.benefits.length > 0 && (
                                 <div>
-                                  <h4 className="font-semibold text-gray-900">Benefícios</h4>
-                                  <div className="flex flex-wrap gap-2 mt-2">
-                                    {selectedJob.benefits.map((benefit, index) => (
-                                      <Badge key={index} variant="outline" className="rounded-full">
-                                        {benefit}
-                                      </Badge>
-                                    ))}
-                                  </div>
+                                  <h4 className="font-semibold text-gray-900">Requisitos</h4>
+                                  <p className="mt-2 text-gray-700 bg-gray-50 p-4 rounded-lg whitespace-pre-wrap">{selectedJob.requirements}</p>
                                 </div>
-                              )}
 
-                              <div className="flex gap-4 pt-4 border-t">
-                                <Button
-                                  onClick={() => setEditMode(true)}
-                                  className="bg-blue-500 hover:bg-blue-600"
-                                >
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Editar Vaga
-                                </Button>
+                                {selectedJob.benefits && selectedJob.benefits.length > 0 && (
+                                  <div>
+                                    <h4 className="font-semibold text-gray-900">Benefícios</h4>
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                      {selectedJob.benefits.map((benefit, index) => (
+                                        <Badge key={index} variant="outline" className="rounded-full">
+                                          {benefit}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
 
-                                {selectedJob.status === 'Ativa' && (
+                                <div className="flex flex-wrap gap-2 pt-4 border-t">
+                                  <Button
+                                    onClick={() => setEditMode(true)}
+                                    className="bg-blue-500 hover:bg-blue-600"
+                                    size="sm"
+                                  >
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Editar
+                                  </Button>
+
+                                  {selectedJob.status === 'Ativa' && (
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => updateJobStatus(selectedJob.id, 'Pausada')}
+                                      className="text-yellow-600 hover:text-yellow-700"
+                                      size="sm"
+                                    >
+                                      <Pause className="w-4 h-4 mr-2" />
+                                      Pausar
+                                    </Button>
+                                  )}
+
+                                  {selectedJob.status === 'Pausada' && (
+                                    <Button
+                                      onClick={() => updateJobStatus(selectedJob.id, 'Ativa')}
+                                      className="bg-green-500 hover:bg-green-600"
+                                      size="sm"
+                                    >
+                                      <CheckCircle className="w-4 h-4 mr-2" />
+                                      Reativar
+                                    </Button>
+                                  )}
+
                                   <Button
                                     variant="outline"
-                                    onClick={() => updateJobStatus(selectedJob.id, 'Pausada')}
-                                    className="text-yellow-600 hover:text-yellow-700"
+                                    onClick={() => updateJobStatus(selectedJob.id, 'Fechada')}
+                                    className="text-red-600 hover:text-red-700"
+                                    size="sm"
                                   >
-                                    <Pause className="w-4 h-4 mr-2" />
-                                    Pausar
+                                    <XCircle className="w-4 h-4 mr-2" />
+                                    Fechar
                                   </Button>
-                                )}
 
-                                {selectedJob.status === 'Pausada' && (
                                   <Button
-                                    onClick={() => updateJobStatus(selectedJob.id, 'Ativa')}
-                                    className="bg-green-500 hover:bg-green-600"
+                                    variant="outline"
+                                    onClick={() => deleteJob(selectedJob.id)}
+                                    className="text-red-600 hover:text-red-700"
+                                    size="sm"
                                   >
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Reativar
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Excluir
                                   </Button>
-                                )}
-
-                                <Button
-                                  variant="outline"
-                                  onClick={() => updateJobStatus(selectedJob.id, 'Finalizada')}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <XCircle className="w-4 h-4 mr-2" />
-                                  Finalizar
-                                </Button>
-
-                                <Button
-                                  variant="outline"
-                                  onClick={() => deleteJob(selectedJob.id)}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Excluir
-                                </Button>
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                            )}
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

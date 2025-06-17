@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { X, Upload, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 interface JobApplicationFormProps {
   isOpen: boolean;
@@ -18,6 +19,8 @@ interface JobApplicationFormProps {
   jobTitle: string;
   companyName: string;
 }
+
+type ApplicationStatus = Database["public"]["Enums"]["application_status"];
 
 const JobApplicationForm = ({ isOpen, onClose, jobId, jobTitle, companyName }: JobApplicationFormProps) => {
   const { toast } = useToast();
@@ -132,7 +135,7 @@ const JobApplicationForm = ({ isOpen, onClose, jobId, jobTitle, companyName }: J
         }
       }
 
-      // Inserir candidatura no banco
+      // Preparar dados da candidatura com tipos corretos
       const applicationData = {
         job_id: jobId,
         name: formData.name,
@@ -145,14 +148,14 @@ const JobApplicationForm = ({ isOpen, onClose, jobId, jobTitle, companyName }: J
         skills: skills.length > 0 ? skills : null,
         cover_letter: formData.cover_letter || null,
         resume_url: resumeUrl,
-        status: 'Novo'
+        status: 'Novo' as ApplicationStatus
       };
 
       console.log('Dados da candidatura:', applicationData);
 
       const { data, error } = await supabase
         .from('applications')
-        .insert([applicationData])
+        .insert(applicationData)
         .select();
 
       if (error) {

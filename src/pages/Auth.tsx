@@ -44,6 +44,11 @@ const Auth = () => {
     setLoading(false);
   };
 
+  const handleAdminLogin = () => {
+    setEmail("admin@vagaspg.com");
+    setPassword("admin123");
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-yellow-50 to-green-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -110,6 +115,21 @@ const Auth = () => {
                     {loading ? "Entrando..." : "Entrar"}
                   </Button>
                 </form>
+
+                {/* Botão de Login Admin */}
+                <div className="mt-4 pt-4 border-t">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleAdminLogin}
+                    className="w-full rounded-xl border-2 border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    🔑 Login como Administrador
+                  </Button>
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    Clique para preencher credenciais de admin automaticamente
+                  </p>
+                </div>
               </TabsContent>
 
               <TabsContent value="register">
@@ -131,11 +151,12 @@ const Auth = () => {
                     <Input
                       id="register-password"
                       type="password"
-                      placeholder="Crie uma senha segura"
+                      placeholder="Crie uma senha segura (mín. 6 caracteres)"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       className="rounded-xl"
+                      minLength={6}
                     />
                   </div>
                   <Button
@@ -164,6 +185,11 @@ const Auth = () => {
             <br />
             <span className="text-green-600 font-medium">contato@vagaspg.com</span>
           </p>
+          <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+            <p className="text-blue-800 font-medium">📧 Credenciais de Admin:</p>
+            <p className="text-blue-700">Email: admin@vagaspg.com</p>
+            <p className="text-blue-700">Senha: admin123</p>
+          </div>
         </div>
       </div>
     </div>

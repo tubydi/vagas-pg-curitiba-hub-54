@@ -32,27 +32,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener
+    // Configurar listener de estado de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Check if user is admin
+          // Verificar se é admin após um delay para evitar problemas de concorrência
           setTimeout(async () => {
             try {
-              const { data: profile } = await supabase
+              const { data: profile, error } = await supabase
                 .from('profiles')
                 .select('role')
                 .eq('id', session.user.id)
                 .single();
               
-              setIsAdmin(profile?.role === 'admin');
+              if (error) {
+                console.log('Erro ao buscar perfil:', error);
+                // Se der erro, assumir que não é admin
+                setIsAdmin(false);
+              } else {
+                setIsAdmin(profile?.role === 'admin');
+                console.log('Profile role:', profile?.role);
+              }
             } catch (error) {
-              console.error('Error checking user role:', error);
+              console.error('Erro ao verificar role do usuário:', error);
+              setIsAdmin(false);
             }
-          }, 0);
+          }, 100);
         } else {
           setIsAdmin(false);
         }
@@ -61,8 +70,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Buscar sessão inicial
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Erro ao buscar sessão:', error);
+      }
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -72,16 +84,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    console.log('Tentando fazer login com:', email);
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
+      console.error('Erro no login:', error);
+      let errorMessage = 'Erro desconhecido no login';
+      
+      if (error.message.includes('Invalid login credentials')) {
+        errorMessage = 'Email ou senha incorretos';
+      } else if (error.message.includes('Email not confirmed')) {
+        errorMessage = 'Email não confirmado. Verifique sua caixa de entrada';
+      } else {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Erro no login",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
+      });
+    } else {
+      console.log('Login bem-sucedido:', data.user?.email);
+      toast({
+        title: "Login realizado com sucesso!",
+        description: `Bem-vindo(a), ${data.user?.email}!`,
       });
     }
 
@@ -89,9 +120,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string) => {
+    console.log('Tentando cadastrar usuário:', email);
+    
     const redirectUrl = `${window.location.origin}/`;
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -100,12 +133,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     if (error) {
+      console.error('Erro no cadastro:', error);
+      let errorMessage = 'Erro desconhecido no cadastro';
+      
+      if (error.message.includes('User already registered')) {
+        errorMessage = 'Este email já está cadastrado';
+      } else if (error.message.includes('Password should be')) {
+        errorMessage = 'A senha deve ter pelo menos 6 caracteres';
+      } else if (error.message.includes('Invalid email')) {
+        errorMessage = 'Email inválido';
+      } else {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Erro no cadastro",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } else {
+      console.log('Cadastro realizado:', data.user?.email);
       toast({
         title: "Cadastro realizado!",
         description: "Verifique seu email para confirmar a conta.",
@@ -116,6 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    console.log('Fazendo logout...');
     await supabase.auth.signOut();
     toast({
       title: "Logout realizado",

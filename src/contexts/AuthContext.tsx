@@ -32,6 +32,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log('Iniciando AuthProvider...')
+    
     // Configurar listener de estado de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -40,25 +42,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Verificar se é admin após um delay para evitar problemas de concorrência
+          // Verificar se é admin
           setTimeout(async () => {
             try {
-              const { data: profile, error } = await supabase
+              const { data: profile } = await supabase
                 .from('profiles')
                 .select('role')
                 .eq('id', session.user.id)
                 .single();
               
-              if (error) {
-                console.log('Erro ao buscar perfil:', error);
-                // Se der erro, assumir que não é admin
-                setIsAdmin(false);
-              } else {
-                setIsAdmin(profile?.role === 'admin');
-                console.log('Profile role:', profile?.role);
-              }
+              setIsAdmin(profile?.role === 'admin');
+              console.log('User role:', profile?.role);
             } catch (error) {
-              console.error('Erro ao verificar role do usuário:', error);
+              console.error('Erro ao verificar role:', error);
               setIsAdmin(false);
             }
           }, 100);
@@ -71,10 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // Buscar sessão inicial
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.error('Erro ao buscar sessão:', error);
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -93,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (error) {
       console.error('Erro no login:', error);
-      let errorMessage = 'Erro desconhecido no login';
+      let errorMessage = 'Erro no login';
       
       if (error.message.includes('Invalid login credentials')) {
         errorMessage = 'Email ou senha incorretos';
@@ -134,14 +127,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (error) {
       console.error('Erro no cadastro:', error);
-      let errorMessage = 'Erro desconhecido no cadastro';
+      let errorMessage = 'Erro no cadastro';
       
       if (error.message.includes('User already registered')) {
         errorMessage = 'Este email já está cadastrado';
       } else if (error.message.includes('Password should be')) {
         errorMessage = 'A senha deve ter pelo menos 6 caracteres';
-      } else if (error.message.includes('Invalid email')) {
-        errorMessage = 'Email inválido';
       } else {
         errorMessage = error.message;
       }

@@ -165,6 +165,11 @@ const Auth = () => {
             <br />
             <span className="text-green-600 font-medium">contato@vagaspg.com</span>
           </p>
+          <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+            <p className="text-blue-800 font-medium">🔧 Para testar o sistema:</p>
+            <p className="text-blue-700">Cadastre-se normalmente com seu email</p>
+            <p className="text-blue-700">Para acesso admin: admin@vagaspg.com</p>
+          </div>
         </div>
       </div>
     </div>

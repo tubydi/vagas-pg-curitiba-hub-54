@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -117,6 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/`,
           data: {
             company_name: companyData?.companyName || '',
             cnpj: companyData?.cnpj || ''
@@ -158,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
             const { error: companyError } = await supabase
               .from('companies')
-              .insert([{
+              .insert({
                 user_id: data.user.id,
                 name: companyData.companyName,
                 cnpj: companyData.cnpj,
@@ -169,8 +169,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 sector: companyData.sector,
                 legal_representative: companyData.legalRepresentative,
                 description: companyData.description || '',
-                status: 'Aprovada' // Aprovar automaticamente
-              }]);
+                status: 'Ativa' // Status válido do enum
+              });
 
             if (companyError) {
               console.error('Company creation error:', companyError);

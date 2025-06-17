@@ -50,15 +50,26 @@ const Index = () => {
   const [totalApplications] = useState(186);
   const { user } = useAuth();
 
+  // BUSCA AUTOMÁTICA DE VAGAS - SEM BOTÃO RECARREGAR
   useEffect(() => {
+    console.log('🔄 Iniciando busca automática de vagas...');
     fetchFeaturedJobs();
+    
+    // Buscar vagas a cada 30 segundos automaticamente
+    const interval = setInterval(() => {
+      console.log('🔄 Busca automática de vagas executada');
+      fetchFeaturedJobs();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const fetchFeaturedJobs = async () => {
     try {
-      console.log('🔍 Buscando vagas em destaque... (ACESSO PÚBLICO)');
+      console.log('🔍 Executando busca MELHORADA de vagas... (ACESSO PÚBLICO)');
       setLoading(true);
       
+      // NOVA ABORDAGEM - busca mais robusta
       const { data, error } = await supabase
         .from('jobs')
         .select(`
@@ -76,19 +87,70 @@ const Index = () => {
 
       if (error) {
         console.error('❌ Erro ao buscar vagas em destaque:', error);
+        
+        // TENTATIVA ALTERNATIVA - busca mais simples
+        console.log('🔄 Tentando abordagem alternativa...');
+        const { data: alternativeData, error: alternativeError } = await supabase
+          .from('jobs')
+          .select('*')
+          .eq('status', 'Ativa')
+          .order('created_at', { ascending: false })
+          .limit(6);
+          
+        if (alternativeError) {
+          console.error('❌ Erro na busca alternativa:', alternativeError);
+          return;
+        }
+        
+        // Buscar dados das empresas separadamente
+        if (alternativeData && alternativeData.length > 0) {
+          const companyIds = [...new Set(alternativeData.map(job => job.company_id))];
+          const { data: companiesData } = await supabase
+            .from('companies')
+            .select('id, name, city, sector')
+            .in('id', companyIds);
+            
+          // Mapear vagas com dados das empresas
+          const jobsWithCompanies = alternativeData.map(job => ({
+            ...job,
+            companies: companiesData?.find(c => c.id === job.company_id) || {
+              id: job.company_id,
+              name: 'Empresa não encontrada',
+              city: 'N/A',
+              sector: 'N/A'
+            }
+          }));
+          
+          console.log('✅ Busca alternativa funcionou:', jobsWithCompanies.length, 'vagas');
+          setFeaturedJobs(jobsWithCompanies);
+        }
         return;
       }
 
       console.log('✅ Vagas em destaque encontradas:', data?.length || 0, 'vagas');
+      console.log('📋 Dados completos das vagas:', data);
       
-      const mappedJobs = (data || []).map(job => ({
-        ...job,
-        has_external_application: job.has_external_application || false,
-        application_method: job.application_method || null,
-        contact_info: job.contact_info || null
-      }));
+      if (data && data.length > 0) {
+        const mappedJobs = data.map(job => ({
+          ...job,
+          has_external_application: job.has_external_application || false,
+          application_method: job.application_method || null,
+          contact_info: job.contact_info || null
+        }));
+        
+        setFeaturedJobs(mappedJobs);
+        console.log('🎯 Vagas configuradas no estado:', mappedJobs.length);
+      } else {
+        console.log('⚠️ Nenhuma vaga encontrada no banco');
+        
+        // VERIFICAÇÃO ADICIONAL - contar total de vagas no banco
+        const { count } = await supabase
+          .from('jobs')
+          .select('*', { count: 'exact', head: true });
+          
+        console.log('📊 Total de vagas no banco:', count);
+      }
       
-      setFeaturedJobs(mappedJobs);
     } catch (error) {
       console.error('❌ Erro inesperado ao buscar vagas:', error);
     } finally {
@@ -303,7 +365,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Vagas em Destaque */}
+      {/* Vagas em Destaque - BUSCA AUTOMÁTICA */}
       <section className="py-8 md:py-20 bg-gradient-to-br from-white to-green-50 relative">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8 md:mb-12">
@@ -311,8 +373,11 @@ const Index = () => {
               Vagas em Destaque
             </h3>
             <p className="text-base md:text-xl text-gray-600 max-w-2xl mx-auto">
-              Oportunidades imperdíveis que chegaram recentemente
+              Oportunidades atualizadas automaticamente
             </p>
+            {loading && (
+              <p className="text-sm text-green-600 mt-2">🔄 Buscando vagas mais recentes...</p>
+            )}
           </div>
           
           {loading ? (
@@ -323,14 +388,17 @@ const Index = () => {
           ) : featuredJobs.length === 0 ? (
             <div className="text-center py-12">
               <Building2 className="h-12 md:h-16 w-12 md:w-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">🎯 As primeiras vagas já foram criadas no banco!</p>
-              <p className="text-gray-500 mt-2">Recarregue a página para ver as vagas em destaque</p>
-              <Button 
-                onClick={fetchFeaturedJobs}
-                className="mt-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full"
-              >
-                🔄 Recarregar Vagas
-              </Button>
+              <h4 className="text-xl font-bold text-gray-700 mb-2">Buscando vagas...</h4>
+              <p className="text-gray-600">Sistema executando busca automática de vagas</p>
+              <div className="mt-4 flex justify-center">
+                <Button 
+                  onClick={fetchFeaturedJobs}
+                  variant="outline"
+                  className="border-green-200 hover:bg-green-50"
+                >
+                  🔄 Tentar buscar novamente
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">

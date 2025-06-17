@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,10 +58,10 @@ interface DashboardJob {
   requirements: string;
   salary: string;
   location: string;
-  contract_type: ContractType;
-  work_mode: WorkMode;
-  experience_level: ExperienceLevel;
-  status: JobStatus;
+  contract_type: string;
+  work_mode: string;
+  experience_level: string;
+  status: string;
   created_at: string;
   benefits: string[] | null;
   company_id: string;
@@ -223,12 +224,48 @@ const Dashboard = () => {
     }
   };
 
+  // CORRIGINDO O BOTÃO SAIR - função melhorada
   const handleSignOut = async () => {
     try {
+      console.log('🚪 Tentando fazer logout...');
+      
+      // Primeiro limpar estados locais
+      setCompany(null);
+      setJobs([]);
+      
+      // Fazer logout no Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('❌ Erro no logout:', error);
+        toast({
+          title: "Erro ao sair",
+          description: "Não foi possível fazer logout. Tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log('✅ Logout realizado com sucesso');
+      
+      // Chamar função de logout do contexto
       await signOut();
+      
+      // Navegar para home
       navigate('/');
+      
+      toast({
+        title: "Logout realizado",
+        description: "Você foi desconectado com sucesso.",
+      });
+      
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('❌ Erro inesperado no logout:', error);
+      toast({
+        title: "Erro inesperado",
+        description: "Ocorreu um erro ao fazer logout.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -621,7 +658,7 @@ const Dashboard = () => {
                       <Button
                         variant="outline"
                         onClick={handleSignOut}
-                        className="w-full justify-start rounded-xl"
+                        className="w-full justify-start rounded-xl text-red-600 border-red-200 hover:bg-red-50"
                       >
                         <LogOut className="w-4 h-4 mr-2" />
                         Sair da Conta

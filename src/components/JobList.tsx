@@ -15,6 +15,16 @@ interface Company {
   name: string;
   city: string;
   sector: string;
+  address?: string;
+  cnpj?: string;
+  created_at?: string;
+  description?: string;
+  email?: string;
+  legal_representative?: string;
+  phone?: string;
+  status?: string;
+  updated_at?: string;
+  user_id?: string;
 }
 
 interface Job {

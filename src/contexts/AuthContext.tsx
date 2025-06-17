@@ -7,12 +7,11 @@ import { useToast } from '@/hooks/use-toast';
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  loading: boolean;
-  isAdmin: boolean;
-  signIn: (email: string, password: string) => Promise<{ error?: any }>;
-  signUp: (email: string, password: string, userData?: any) => Promise<{ error?: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  createCompanyProfile: (companyData: any) => Promise<{ error?: any }>;
+  isAdmin: boolean;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,19 +35,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state change:', event, session?.user?.email);
+        console.log('Auth state changed:', event, session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Check if user is admin
-          const isUserAdmin = session.user.email === 'admin@vagaspg.com';
-          setIsAdmin(isUserAdmin);
-          
-          // Ensure profile exists with timeout to avoid blocking
+          // Check admin status
           setTimeout(async () => {
-            await ensureProfileExists(session.user);
-          }, 100);
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', session.user.id)
+                .maybeSingle();
+              
+              setIsAdmin(profile?.role === 'admin');
+            } catch (error) {
+              console.error('Error checking admin status:', error);
+            }
+          }, 0);
         } else {
           setIsAdmin(false);
         }
@@ -59,66 +64,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        const isUserAdmin = session.user.email === 'admin@vagaspg.com';
-        setIsAdmin(isUserAdmin);
-        
-        // Ensure profile exists with timeout to avoid blocking
-        setTimeout(async () => {
-          await ensureProfileExists(session.user);
-        }, 100);
-      }
-      
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const ensureProfileExists = async (user: User) => {
-    try {
-      console.log('Checking if profile exists for user:', user.email);
-      
-      // Check if profile already exists
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (!existingProfile) {
-        console.log('Creating profile for user:', user.email);
-        
-        const role = user.email === 'admin@vagaspg.com' ? 'admin' : 'company';
-        
-        const { error } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            email: user.email,
-            role: role
-          });
-
-        if (error && !error.message.includes('duplicate key')) {
-          console.error('Error creating profile:', error);
-        } else {
-          console.log('Profile created successfully');
-        }
-      } else {
-        console.log('Profile already exists');
-      }
-    } catch (error) {
-      console.error('Error in ensureProfileExists:', error);
-    }
-  };
-
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('Attempting to sign in:', email);
+      console.log('Attempting sign in for:', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -127,198 +83,122 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Sign in error:', error);
-        let errorMessage = 'Erro no login. Tente novamente.';
-        
-        if (error.message === 'Invalid login credentials') {
-          errorMessage = "Email ou senha incorretos. Verifique se você confirmou seu email e se está usando o email corporativo cadastrado.";
-        } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = "Email não confirmado. Verifique sua caixa de entrada e clique no link de confirmação.";
-        }
-        
         toast({
           title: "Erro no login",
-          description: errorMessage,
+          description: error.message === 'Invalid login credentials' 
+            ? "Email ou senha incorretos" 
+            : error.message,
           variant: "destructive",
-          duration: 5000,
         });
         return { error };
       }
 
-      console.log('Sign in successful');
-      toast({
-        title: "✅ Login realizado com sucesso!",
-        description: `Bem-vindo de volta, ${email}!`,
-        duration: 3000,
-      });
+      if (data.user) {
+        toast({
+          title: "Login realizado",
+          description: "Bem-vindo de volta!",
+        });
+      }
 
       return { error: null };
     } catch (error) {
-      console.error('Unexpected sign in error:', error);
-      toast({
-        title: "Erro inesperado",
-        description: "Ocorreu um erro durante o login. Tente novamente.",
-        variant: "destructive",
-        duration: 5000,
-      });
+      console.error('Sign in catch error:', error);
       return { error };
     }
   };
 
-  const signUp = async (email: string, password: string, userData?: any) => {
+  const signUp = async (email: string, password: string, companyData?: any) => {
     try {
-      console.log('Attempting to sign up:', email);
+      console.log('Attempting sign up for:', email);
       
-      const redirectUrl = `${window.location.origin}/`;
+      const redirectUrl = `${window.location.origin}/auth`;
       
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: redirectUrl,
-          data: userData
+          emailRedirectTo: redirectUrl
         }
       });
 
       if (error) {
         console.error('Sign up error:', error);
-        
-        let errorMessage = error.message;
-        if (error.message.includes('already registered')) {
-          errorMessage = 'Este email já está cadastrado. Tente fazer login.';
-        } else if (error.message.includes('weak password')) {
-          errorMessage = 'A senha deve ter pelo menos 6 caracteres.';
-        } else if (error.message.includes('rate limit')) {
-          errorMessage = 'Muitas tentativas. Aguarde um momento e tente novamente.';
-        }
-        
         toast({
           title: "Erro no cadastro",
-          description: errorMessage,
+          description: error.message,
           variant: "destructive",
-          duration: 6000,
         });
         return { error };
       }
 
-      if (data.user && !data.session) {
-        console.log('User created, needs email confirmation:', data.user.email);
-        toast({
-          title: "✅ Conta criada com sucesso!",
-          description: "Verifique seu email e clique no link de confirmação para ativar sua conta. Após confirmar, faça login novamente.",
-          duration: 8000,
-        });
-        return { error: null };
+      // Se há dados da empresa e o usuário foi criado
+      if (data.user && companyData) {
+        console.log('Creating company data for user:', data.user.id);
+        
+        try {
+          const { error: companyError } = await supabase
+            .from('companies')
+            .insert([{
+              user_id: data.user.id,
+              name: companyData.companyName,
+              cnpj: companyData.cnpj,
+              email: companyData.email,
+              phone: companyData.phone,
+              address: companyData.address,
+              city: companyData.city,
+              sector: companyData.sector,
+              legal_representative: companyData.legalRepresentative,
+              description: companyData.description || '',
+              status: 'Pendente'
+            }]);
+
+          if (companyError) {
+            console.error('Company creation error:', companyError);
+          } else {
+            console.log('Company data created successfully');
+          }
+        } catch (companyCreationError) {
+          console.error('Error creating company:', companyCreationError);
+        }
       }
 
       return { error: null };
     } catch (error) {
-      console.error('Unexpected sign up error:', error);
-      toast({
-        title: "Erro inesperado",
-        description: "Ocorreu um erro durante o cadastro. Tente novamente.",
-        variant: "destructive",
-        duration: 5000,
-      });
+      console.error('Sign up catch error:', error);
       return { error };
     }
   };
 
   const signOut = async () => {
     try {
-      console.log('Signing out');
-      await supabase.auth.signOut();
+      console.log('Signing out...');
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
       
-      // Limpar dados locais
+      if (error) {
+        console.error('Sign out error:', error);
+        throw error;
+      }
+
+      // Force clear all local state
       setUser(null);
       setSession(null);
       setIsAdmin(false);
       
-      toast({
-        title: "Logout realizado",
-        description: "Você foi desconectado com sucesso.",
-        duration: 3000,
-      });
+      console.log('Sign out successful');
     } catch (error) {
-      console.error('Sign out error:', error);
-      toast({
-        title: "Erro no logout",
-        description: "Ocorreu um erro ao desconectar.",
-        variant: "destructive",
-        duration: 5000,
-      });
-    }
-  };
-
-  const createCompanyProfile = async (companyData: any) => {
-    try {
-      console.log('Creating company profile:', companyData);
-      
-      if (!user) {
-        return { error: { message: 'Usuário não autenticado' } };
-      }
-
-      const { error } = await supabase
-        .from('companies')
-        .insert({
-          user_id: user.id,
-          name: companyData.name,
-          cnpj: companyData.cnpj,
-          email: companyData.email,
-          phone: companyData.phone,
-          address: companyData.address,
-          city: companyData.city,
-          sector: companyData.sector,
-          legal_representative: companyData.legal_representative,
-          description: companyData.description || null,
-          status: 'Pendente' // Usar status válido
-        });
-
-      if (error) {
-        console.error('Error creating company:', error);
-        
-        let errorMessage = error.message;
-        if (error.code === '23505' && error.message.includes('cnpj')) {
-          errorMessage = 'Este CNPJ já está cadastrado no sistema.';
-        }
-        
-        toast({
-          title: "Erro ao cadastrar empresa",
-          description: errorMessage,
-          variant: "destructive",
-          duration: 6000,
-        });
-        return { error };
-      }
-
-      console.log('Company profile created successfully');
-      toast({
-        title: "Empresa cadastrada com sucesso!",
-        description: "Sua empresa foi cadastrada e está aguardando aprovação.",
-        duration: 5000,
-      });
-
-      return { error: null };
-    } catch (error) {
-      console.error('Unexpected error creating company:', error);
-      toast({
-        title: "Erro inesperado",
-        description: "Ocorreu um erro ao cadastrar a empresa. Tente novamente.",
-        variant: "destructive",
-        duration: 5000,
-      });
-      return { error };
+      console.error('Error signing out:', error);
+      throw error;
     }
   };
 
   const value = {
     user,
     session,
-    loading,
-    isAdmin,
     signIn,
     signUp,
     signOut,
-    createCompanyProfile,
+    isAdmin,
+    loading,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

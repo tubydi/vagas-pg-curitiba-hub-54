@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,9 +36,9 @@ const Dashboard = () => {
         .from('companies')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (companyError && companyError.code !== 'PGRST116') {
+      if (companyError) {
         console.error('Erro ao buscar empresa:', companyError);
         toast({
           title: "Erro",
@@ -50,18 +49,16 @@ const Dashboard = () => {
       }
 
       if (!companyData) {
-        toast({
-          title: "Empresa não encontrada",
-          description: "Complete seu cadastro de empresa primeiro.",
-          variant: "destructive"
-        });
-        navigate("/auth");
+        console.log('Empresa não encontrada para o usuário:', user.email);
+        setJobs([]);
+        setCompany(null);
+        setLoading(false);
         return;
       }
 
       setCompany(companyData);
 
-      // Buscar vagas da empresa
+      // Buscar vagas da empresa apenas se a empresa existe
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select('*')
@@ -247,7 +244,8 @@ const Dashboard = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/");
+    // Forçar redirecionamento após logout
+    window.location.href = "/";
   };
 
   if (loading) {
@@ -256,6 +254,49 @@ const Dashboard = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Verificar se não há empresa cadastrada
+  if (!company) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-yellow-50 to-green-50">
+        {/* Header */}
+        <header className="bg-white/90 backdrop-blur-md shadow-lg border-b border-green-100 sticky top-0 z-50">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="bg-gradient-to-r from-green-500 to-green-600 p-2 rounded-xl">
+                  <Building2 className="h-6 w-6 md:h-8 md:w-8 text-white" />
+                </div>
+                <h1 className="text-xl md:text-3xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent">
+                  VAGAS PG
+                </h1>
+              </div>
+              <Button onClick={handleSignOut} variant="outline" size="sm" className="rounded-full">
+                <LogOut className="w-4 h-4 mr-1 md:mr-2" />
+                <span className="hidden md:inline">Sair</span>
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[calc(100vh-200px)]">
+          <Card className="max-w-md w-full bg-white rounded-3xl shadow-xl border-0">
+            <CardContent className="p-8 text-center">
+              <Building2 className="h-16 w-16 text-red-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Empresa não encontrada</h3>
+              <p className="text-gray-600 mb-6">Complete seu cadastro de empresa primeiro para acessar o painel.</p>
+              <Button 
+                onClick={() => navigate("/auth")}
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl w-full"
+              >
+                Completar Cadastro
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );

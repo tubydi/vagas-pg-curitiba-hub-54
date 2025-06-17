@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MapPin, Clock, DollarSign, Search, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
-import JobApplicationForm from './JobApplicationForm';
+import { useToast } from '@/hooks/use-toast';
 
 type Job = Database['public']['Tables']['jobs']['Row'] & {
   companies: Database['public']['Tables']['companies']['Row'];
@@ -22,8 +22,7 @@ const JobList = () => {
   const [selectedCity, setSelectedCity] = useState('all');
   const [selectedContractType, setSelectedContractType] = useState('all');
   const [selectedWorkMode, setSelectedWorkMode] = useState('all');
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [isApplicationFormOpen, setIsApplicationFormOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchJobs();
@@ -35,20 +34,41 @@ const JobList = () => {
 
   const fetchJobs = async () => {
     try {
+      console.log('Buscando vagas públicas...');
+      
       const { data, error } = await supabase
         .from('jobs')
         .select(`
           *,
-          companies (*)
+          companies (
+            id,
+            name,
+            city,
+            sector
+          )
         `)
         .eq('status', 'Ativa')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar vagas:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar vagas. Tente novamente.",
+          variant: "destructive"
+        });
+        return;
+      }
 
+      console.log('Vagas encontradas:', data?.length || 0);
       setJobs(data || []);
     } catch (error) {
-      console.error('Erro ao buscar vagas:', error);
+      console.error('Erro inesperado ao buscar vagas:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao carregar vagas.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -60,7 +80,7 @@ const JobList = () => {
     if (searchTerm) {
       filtered = filtered.filter(job =>
         job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.companies.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (job.companies?.name && job.companies.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
         job.description.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -80,16 +100,6 @@ const JobList = () => {
     }
 
     setFilteredJobs(filtered);
-  };
-
-  const handleApplyJob = (job: Job) => {
-    setSelectedJob(job);
-    setIsApplicationFormOpen(true);
-  };
-
-  const closeApplicationForm = () => {
-    setIsApplicationFormOpen(false);
-    setSelectedJob(null);
   };
 
   if (loading) {
@@ -118,10 +128,10 @@ const JobList = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Filtros */}
-      <Card className="mb-8">
+      <Card className="mb-8 shadow-lg rounded-2xl border-0">
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <Filter className="w-5 h-5 mr-2" />
+          <CardTitle className="flex items-center text-xl font-bold">
+            <Filter className="w-5 h-5 mr-2 text-green-600" />
             Filtrar Vagas
           </CardTitle>
         </CardHeader>
@@ -133,21 +143,23 @@ const JobList = () => {
                 placeholder="Buscar vagas..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 rounded-xl"
               />
             </div>
             <Select value={selectedCity} onValueChange={setSelectedCity}>
-              <SelectTrigger>
+              <SelectTrigger className="rounded-xl">
                 <SelectValue placeholder="Cidade" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as cidades</SelectItem>
                 <SelectItem value="ponta grossa">Ponta Grossa</SelectItem>
                 <SelectItem value="curitiba">Curitiba</SelectItem>
+                <SelectItem value="londrina">Londrina</SelectItem>
+                <SelectItem value="maringá">Maringá</SelectItem>
               </SelectContent>
             </Select>
             <Select value={selectedContractType} onValueChange={setSelectedContractType}>
-              <SelectTrigger>
+              <SelectTrigger className="rounded-xl">
                 <SelectValue placeholder="Tipo de contrato" />
               </SelectTrigger>
               <SelectContent>
@@ -159,7 +171,7 @@ const JobList = () => {
               </SelectContent>
             </Select>
             <Select value={selectedWorkMode} onValueChange={setSelectedWorkMode}>
-              <SelectTrigger>
+              <SelectTrigger className="rounded-xl">
                 <SelectValue placeholder="Modalidade" />
               </SelectTrigger>
               <SelectContent>
@@ -176,14 +188,14 @@ const JobList = () => {
       {/* Lista de vagas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredJobs.map((job) => (
-          <Card key={job.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-lg">{job.title}</CardTitle>
+          <Card key={job.id} className="hover:shadow-xl transition-all duration-300 rounded-2xl border-0 overflow-hidden bg-white">
+            <CardHeader className="bg-gradient-to-r from-green-50 to-yellow-50">
+              <CardTitle className="text-lg font-bold text-gray-900">{job.title}</CardTitle>
               <CardDescription className="text-green-600 font-semibold">
-                {job.companies.name}
+                {job.companies?.name || 'Empresa não informada'}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               <div className="space-y-3">
                 <p className="text-sm text-gray-600 line-clamp-2">{job.description}</p>
                 
@@ -192,7 +204,7 @@ const JobList = () => {
                     <MapPin className="w-4 h-4 mr-1 text-gray-400" />
                     <span>{job.location}</span>
                   </div>
-                  <Badge variant="outline">{job.work_mode}</Badge>
+                  <Badge variant="outline" className="rounded-full">{job.work_mode}</Badge>
                 </div>
                 
                 <div className="flex items-center justify-between text-sm">
@@ -200,7 +212,7 @@ const JobList = () => {
                     <DollarSign className="w-4 h-4 mr-1 text-gray-400" />
                     <span className="font-semibold text-green-600">{job.salary}</span>
                   </div>
-                  <Badge variant="outline">{job.contract_type}</Badge>
+                  <Badge variant="outline" className="rounded-full">{job.contract_type}</Badge>
                 </div>
                 
                 <div className="flex items-center text-xs text-gray-500">
@@ -209,8 +221,8 @@ const JobList = () => {
                 </div>
                 
                 <Button 
-                  onClick={() => handleApplyJob(job)}
-                  className="w-full mt-4"
+                  onClick={() => window.open(`mailto:${job.companies?.name ? 'contato@' + job.companies.name.toLowerCase().replace(/\s+/g, '') + '.com' : 'contato@empresa.com'}?subject=Candidatura para ${job.title}`)}
+                  className="w-full mt-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl"
                 >
                   Candidatar-se
                 </Button>
@@ -220,20 +232,14 @@ const JobList = () => {
         ))}
       </div>
 
-      {filteredJobs.length === 0 && (
+      {filteredJobs.length === 0 && !loading && (
         <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">Nenhuma vaga encontrada com os filtros aplicados.</p>
-        </div>
-      )}
-
-      {/* Modal de candidatura */}
-      {selectedJob && isApplicationFormOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <JobApplicationForm
-              job={selectedJob}
-              onClose={closeApplicationForm}
-            />
+          <div className="max-w-md mx-auto">
+            <div className="bg-gradient-to-r from-green-100 to-yellow-100 rounded-2xl p-8">
+              <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhuma vaga encontrada</h3>
+              <p className="text-gray-600">Tente ajustar os filtros ou buscar por outros termos.</p>
+            </div>
           </div>
         </div>
       )}

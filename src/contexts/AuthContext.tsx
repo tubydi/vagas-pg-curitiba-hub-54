@@ -202,6 +202,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data.user && !data.session) {
         console.log('User created, needs email confirmation:', data.user.email);
+        toast({
+          title: "✅ Conta criada com sucesso!",
+          description: "Verifique seu email e clique no link de confirmação para ativar sua conta. Após confirmar, faça login novamente.",
+          duration: 8000,
+        });
         return { error: null };
       }
 
@@ -222,6 +227,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Signing out');
       await supabase.auth.signOut();
+      
+      // Limpar dados locais
+      setUser(null);
+      setSession(null);
+      setIsAdmin(false);
+      
       toast({
         title: "Logout realizado",
         description: "Você foi desconectado com sucesso.",
@@ -259,7 +270,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           sector: companyData.sector,
           legal_representative: companyData.legal_representative,
           description: companyData.description || null,
-          status: 'Aprovada' // Automático para facilitar o teste
+          status: 'Pendente' // Usar status válido
         });
 
       if (error) {
@@ -282,7 +293,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Company profile created successfully');
       toast({
         title: "Empresa cadastrada com sucesso!",
-        description: "Sua empresa foi cadastrada e aprovada automaticamente.",
+        description: "Sua empresa foi cadastrada e está aguardando aprovação.",
         duration: 5000,
       });
 

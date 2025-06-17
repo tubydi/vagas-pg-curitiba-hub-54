@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,19 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, MapPin, Search, Users, TrendingUp, Star, Clock, DollarSign, Brain, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import JobApplicationForm from "@/components/JobApplicationForm";
 
 const Index = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCity, setSelectedCity] = useState("all");
-  const { toast } = useToast();
+  const [selectedJob, setSelectedJob] = useState<{id: string, title: string, company: string} | null>(null);
+  const [isApplicationFormOpen, setIsApplicationFormOpen] = useState(false);
   const { user } = useAuth();
 
   // Mock data para demonstração
   const featuredJobs = [
     {
-      id: 1,
+      id: "1",
       title: "Desenvolvedor Full Stack",
       company: "Tech PG",
       location: "Ponta Grossa",
@@ -31,7 +31,7 @@ const Index = () => {
       postedAt: "2 dias atrás"
     },
     {
-      id: 2,
+      id: "2",
       title: "Analista de Marketing Digital",
       company: "Marketing Solutions",
       location: "Curitiba",
@@ -43,7 +43,7 @@ const Index = () => {
       postedAt: "1 dia atrás"
     },
     {
-      id: 3,
+      id: "3",
       title: "Designer UX/UI",
       company: "Creative Agency",
       location: "Ponta Grossa",
@@ -55,7 +55,7 @@ const Index = () => {
       postedAt: "3 dias atrás"
     },
     {
-      id: 4,
+      id: "4",
       title: "Analista de Vendas",
       company: "Vendas Plus",
       location: "Curitiba",
@@ -68,11 +68,14 @@ const Index = () => {
     }
   ];
 
-  const handleApplyJob = (jobId: number, jobTitle: string) => {
-    toast({
-      title: "Candidatura enviada!",
-      description: `Sua candidatura para "${jobTitle}" foi enviada com sucesso.`,
-    });
+  const handleApplyJob = (jobId: string, jobTitle: string, companyName: string) => {
+    setSelectedJob({ id: jobId, title: jobTitle, company: companyName });
+    setIsApplicationFormOpen(true);
+  };
+
+  const closeApplicationForm = () => {
+    setIsApplicationFormOpen(false);
+    setSelectedJob(null);
   };
 
   return (
@@ -274,7 +277,7 @@ const Index = () => {
                   </div>
                   
                   <Button 
-                    onClick={() => handleApplyJob(job.id, job.title)}
+                    onClick={() => handleApplyJob(job.id, job.title, job.company)}
                     className="w-full mt-6 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
                   >
                     Candidatar-se Agora
@@ -336,6 +339,17 @@ const Index = () => {
           </div>
         </div>
       </footer>
+
+      {/* Modal de Candidatura */}
+      {selectedJob && (
+        <JobApplicationForm
+          isOpen={isApplicationFormOpen}
+          onClose={closeApplicationForm}
+          jobId={selectedJob.id}
+          jobTitle={selectedJob.title}
+          companyName={selectedJob.company}
+        />
+      )}
     </div>
   );
 };

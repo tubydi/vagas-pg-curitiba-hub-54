@@ -9,7 +9,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string) => Promise<{ data: any; error: any }>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
 }
@@ -42,22 +42,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Verificar se é admin
+          // Verificar se é admin após o login
           setTimeout(async () => {
             try {
-              const { data: profile } = await supabase
+              const { data: profile, error } = await supabase
                 .from('profiles')
                 .select('role')
                 .eq('id', session.user.id)
                 .single();
               
-              setIsAdmin(profile?.role === 'admin');
-              console.log('User role:', profile?.role);
+              if (error) {
+                console.error('Erro ao verificar role:', error);
+                setIsAdmin(false);
+              } else {
+                setIsAdmin(profile?.role === 'admin');
+                console.log('User role:', profile?.role);
+              }
             } catch (error) {
               console.error('Erro ao verificar role:', error);
               setIsAdmin(false);
             }
-          }, 100);
+          }, 1000);
         } else {
           setIsAdmin(false);
         }
@@ -105,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Login bem-sucedido:', data.user?.email);
       toast({
         title: "Login realizado com sucesso!",
-        description: `Bem-vindo(a), ${data.user?.email}!`,
+        description: `Bem-vindo(a)!`,
       });
     }
 
@@ -146,11 +151,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Cadastro realizado:', data.user?.email);
       toast({
         title: "Cadastro realizado!",
-        description: "Verifique seu email para confirmar a conta.",
+        description: "Conta criada com sucesso.",
       });
     }
 
-    return { error };
+    return { data, error };
   };
 
   const signOut = async () => {

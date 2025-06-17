@@ -5,23 +5,66 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Building2, ArrowLeft } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [validatingCnpj, setValidatingCnpj] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Dados da empresa para cadastro
+  const [companyData, setCompanyData] = useState({
+    companyName: "",
+    cnpj: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    sector: "",
+    legalRepresentative: "",
+    password: "",
+    confirmPassword: "",
+    description: ""
+  });
 
   useEffect(() => {
     if (user) {
       navigate("/dashboard");
     }
   }, [user, navigate]);
+
+  const validateCnpj = async (cnpj: string) => {
+    try {
+      setValidatingCnpj(true);
+      
+      // Chamar edge function para validar CNPJ
+      const { data, error } = await supabase.functions.invoke('validate-cnpj', {
+        body: { cnpj: cnpj.replace(/\D/g, '') }
+      });
+
+      if (error) {
+        throw new Error('Erro ao validar CNPJ');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Erro na validação do CNPJ:', error);
+      return { valid: false, message: 'Erro ao validar CNPJ' };
+    } finally {
+      setValidatingCnpj(false);
+    }
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,14 +82,112 @@ const Auth = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Validações básicas
+    if (companyData.password !== companyData.confirmPassword) {
+      toast({
+        title: "Erro de validação",
+        description: "As senhas não coincidem.",
+        variant: "destructive"
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (companyData.password.length < 6) {
+      toast({
+        title: "Erro de validação",
+        description: "A senha deve ter pelo menos 6 caracteres.",
+        variant: "destructive"
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Validar CNPJ
+    const cnpjValidation = await validateCnpj(companyData.cnpj);
+    if (!cnpjValidation.valid) {
+      toast({
+        title: "CNPJ Inválido",
+        description: cnpjValidation.message || "CNPJ não encontrado ou inválido nos registros da Receita Federal.",
+        variant: "destructive"
+      });
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Criar usuário no Supabase Auth
+      const { data: authData, error: authError } = await signUp(companyData.email, companyData.password);
+      
+      if (authError) {
+        setLoading(false);
+        return;
+      }
+
+      // Aguardar um pouco para o trigger criar o profile
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Criar empresa no banco
+      const { error: companyError } = await supabase
+        .from('companies')
+        .insert({
+          user_id: authData.user?.id,
+          name: companyData.companyName,
+          cnpj: companyData.cnpj.replace(/\D/g, ''),
+          email: companyData.email,
+          phone: companyData.phone,
+          address: companyData.address,
+          city: companyData.city,
+          sector: companyData.sector,
+          legal_representative: companyData.legalRepresentative,
+          description: companyData.description,
+          status: 'Pendente'
+        });
+
+      if (companyError) {
+        console.error('Erro ao salvar empresa:', companyError);
+        toast({
+          title: "Erro no cadastro",
+          description: "Erro ao salvar dados da empresa. Tente novamente.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Cadastro realizado com sucesso!",
+          description: "Sua empresa foi cadastrada e está aguardando aprovação.",
+        });
+        navigate("/dashboard");
+      }
+    } catch (error) {
+      console.error('Erro no cadastro:', error);
+      toast({
+        title: "Erro no cadastro",
+        description: "Erro inesperado. Tente novamente.",
+        variant: "destructive"
+      });
+    }
     
-    await signUp(email, password);
     setLoading(false);
+  };
+
+  const handleCompanyInputChange = (field: string, value: string) => {
+    setCompanyData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const formatCnpj = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    return numbers.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+  };
+
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    return numbers.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3');
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-yellow-50 to-green-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-2xl">
         {/* Header */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center space-x-3 mb-6">
@@ -113,38 +254,182 @@ const Auth = () => {
               </TabsContent>
 
               <TabsContent value="register">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="register-email">Email da Empresa</Label>
-                    <Input
-                      id="register-email"
-                      type="email"
-                      placeholder="contato@suaempresa.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="rounded-xl"
-                    />
+                <form onSubmit={handleSignUp} className="space-y-6">
+                  {/* Dados da Empresa */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+                      Dados da Empresa
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="companyName">Nome da Empresa *</Label>
+                        <Input
+                          id="companyName"
+                          value={companyData.companyName}
+                          onChange={(e) => handleCompanyInputChange("companyName", e.target.value)}
+                          required
+                          placeholder="Ex: Tech Solutions Ltda"
+                          className="rounded-xl"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="cnpj">CNPJ *</Label>
+                        <Input
+                          id="cnpj"
+                          value={formatCnpj(companyData.cnpj)}
+                          onChange={(e) => handleCompanyInputChange("cnpj", e.target.value)}
+                          required
+                          placeholder="00.000.000/0000-00"
+                          className="rounded-xl"
+                          maxLength={18}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="register-email">E-mail Corporativo *</Label>
+                        <Input
+                          id="register-email"
+                          type="email"
+                          value={companyData.email}
+                          onChange={(e) => handleCompanyInputChange("email", e.target.value)}
+                          required
+                          placeholder="contato@empresa.com"
+                          className="rounded-xl"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="phone">Telefone *</Label>
+                        <Input
+                          id="phone"
+                          value={formatPhone(companyData.phone)}
+                          onChange={(e) => handleCompanyInputChange("phone", e.target.value)}
+                          required
+                          placeholder="(42) 99999-9999"
+                          className="rounded-xl"
+                          maxLength={15}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="address">Endereço Completo *</Label>
+                      <Input
+                        id="address"
+                        value={companyData.address}
+                        onChange={(e) => handleCompanyInputChange("address", e.target.value)}
+                        required
+                        placeholder="Rua, número, bairro, CEP"
+                        className="rounded-xl"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="city">Cidade *</Label>
+                        <Select value={companyData.city} onValueChange={(value) => handleCompanyInputChange("city", value)}>
+                          <SelectTrigger className="rounded-xl">
+                            <SelectValue placeholder="Selecione a cidade" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Ponta Grossa">Ponta Grossa</SelectItem>
+                            <SelectItem value="Curitiba">Curitiba</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="sector">Área de Atuação *</Label>
+                        <Select value={companyData.sector} onValueChange={(value) => handleCompanyInputChange("sector", value)}>
+                          <SelectTrigger className="rounded-xl">
+                            <SelectValue placeholder="Selecione o setor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="tecnologia">Tecnologia</SelectItem>
+                            <SelectItem value="marketing">Marketing</SelectItem>
+                            <SelectItem value="vendas">Vendas</SelectItem>
+                            <SelectItem value="financeiro">Financeiro</SelectItem>
+                            <SelectItem value="recursos-humanos">Recursos Humanos</SelectItem>
+                            <SelectItem value="educacao">Educação</SelectItem>
+                            <SelectItem value="saude">Saúde</SelectItem>
+                            <SelectItem value="industria">Indústria</SelectItem>
+                            <SelectItem value="servicos">Serviços</SelectItem>
+                            <SelectItem value="outros">Outros</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="legalRepresentative">Responsável Legal *</Label>
+                      <Input
+                        id="legalRepresentative"
+                        value={companyData.legalRepresentative}
+                        onChange={(e) => handleCompanyInputChange("legalRepresentative", e.target.value)}
+                        required
+                        placeholder="Nome completo do responsável"
+                        className="rounded-xl"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="description">Descrição da Empresa</Label>
+                      <Textarea
+                        id="description"
+                        value={companyData.description}
+                        onChange={(e) => handleCompanyInputChange("description", e.target.value)}
+                        placeholder="Conte um pouco sobre sua empresa, missão, valores..."
+                        className="h-24 rounded-xl"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-password">Senha</Label>
-                    <Input
-                      id="register-password"
-                      type="password"
-                      placeholder="Crie uma senha segura (mín. 6 caracteres)"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="rounded-xl"
-                      minLength={6}
-                    />
+
+                  {/* Dados de Acesso */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+                      Dados de Acesso
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="register-password">Senha *</Label>
+                        <Input
+                          id="register-password"
+                          type="password"
+                          value={companyData.password}
+                          onChange={(e) => handleCompanyInputChange("password", e.target.value)}
+                          required
+                          placeholder="Mínimo 6 caracteres"
+                          className="rounded-xl"
+                          minLength={6}
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="confirmPassword">Confirmar Senha *</Label>
+                        <Input
+                          id="confirmPassword"
+                          type="password"
+                          value={companyData.confirmPassword}
+                          onChange={(e) => handleCompanyInputChange("confirmPassword", e.target.value)}
+                          required
+                          placeholder="Confirme sua senha"
+                          className="rounded-xl"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <Button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl"
-                    disabled={loading}
+
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl h-12 text-lg"
+                    disabled={loading || validatingCnpj}
                   >
-                    {loading ? "Cadastrando..." : "Cadastrar Empresa"}
+                    {loading ? "Cadastrando..." : validatingCnpj ? "Validando CNPJ..." : "Cadastrar Empresa"}
                   </Button>
                 </form>
               </TabsContent>
@@ -158,19 +443,6 @@ const Auth = () => {
             </div>
           </CardContent>
         </Card>
-
-        <div className="text-center mt-6 text-sm text-gray-600">
-          <p>
-            Problemas com acesso? Entre em contato:
-            <br />
-            <span className="text-green-600 font-medium">contato@vagaspg.com</span>
-          </p>
-          <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-            <p className="text-blue-800 font-medium">🔧 Para testar o sistema:</p>
-            <p className="text-blue-700">Cadastre-se normalmente com seu email</p>
-            <p className="text-blue-700">Para acesso admin: admin@vagaspg.com</p>
-          </div>
-        </div>
       </div>
     </div>
   );

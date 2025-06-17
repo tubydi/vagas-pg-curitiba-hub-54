@@ -25,8 +25,6 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/login" element={<Auth />} />
-            <Route path="/register" element={<Auth />} />
             <Route 
               path="/dashboard" 
               element={

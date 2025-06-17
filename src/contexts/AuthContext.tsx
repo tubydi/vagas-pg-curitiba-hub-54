@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +12,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   isAdmin: boolean;
   loading: boolean;
+  createAdminUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -74,6 +76,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
+  const createAdminUser = async () => {
+    try {
+      console.log('Criando usuário admin...');
+      
+      const { data, error } = await supabase.auth.signUp({
+        email: 'admin@vagaspg.com',
+        password: 'admin123',
+        options: {
+          data: {
+            role: 'admin',
+            name: 'Administrador'
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Erro ao criar admin:', error);
+        if (error.message.includes('User already registered')) {
+          toast({
+            title: "Usuário admin já existe",
+            description: "O usuário admin@vagaspg.com já foi criado anteriormente.",
+          });
+        } else {
+          toast({
+            title: "Erro ao criar admin",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+
+      console.log('Admin criado com sucesso:', data);
+      toast({
+        title: "✅ Usuário admin criado!",
+        description: "Agora você pode fazer login com admin@vagaspg.com e senha admin123",
+      });
+
+    } catch (error) {
+      console.error('Erro ao criar admin:', error);
+      toast({
+        title: "Erro inesperado",
+        description: "Erro ao criar usuário administrador.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     try {
       console.log('Attempting sign in for:', email);
@@ -85,6 +135,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Sign in error:', error);
+        
+        // Se é tentativa de login do admin e da erro de credenciais, oferecer criar o usuário
+        if (email === 'admin@vagaspg.com' && error.message === 'Invalid login credentials') {
+          toast({
+            title: "Usuário admin não encontrado",
+            description: "Vou criar o usuário admin para você. Aguarde...",
+          });
+          
+          // Criar usuário admin automaticamente
+          await createAdminUser();
+          
+          // Tentar login novamente após 2 segundos
+          setTimeout(async () => {
+            console.log('Tentando login do admin novamente...');
+            const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+              email,
+              password,
+            });
+            
+            if (retryError) {
+              console.error('Erro no retry do login admin:', retryError);
+              toast({
+                title: "Erro no login",
+                description: "Mesmo após criar o usuário, o login falhou. Tente novamente em alguns segundos.",
+                variant: "destructive",
+              });
+            } else {
+              console.log('Login admin bem-sucedido no retry!');
+              toast({
+                title: "🔑 Login de Administrador",
+                description: "Bem-vindo ao painel administrativo!",
+              });
+            }
+          }, 2000);
+          
+          return { error: null };
+        }
         
         toast({
           title: "Erro no login",
@@ -244,6 +331,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     isAdmin,
     loading,
+    createAdminUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

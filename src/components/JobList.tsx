@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +41,9 @@ interface Job {
   benefits: string[] | null;
   company_id: string;
   companies: Company;
+  has_external_application: boolean;
+  application_method?: string;
+  contact_info?: string;
 }
 
 const JobList = () => {
@@ -94,6 +96,32 @@ const JobList = () => {
   const handleApplyJob = (job: Job) => {
     setSelectedJob(job);
     setIsApplicationFormOpen(true);
+  };
+
+  const handleDirectApplication = (job: Job) => {
+    const { application_method, contact_info } = job;
+    
+    if (application_method === 'WhatsApp' && contact_info) {
+      // Extrair apenas números do WhatsApp
+      const whatsappNumber = contact_info.replace(/\D/g, '');
+      const message = encodeURIComponent(`Olá! Gostaria de me candidatar para a vaga de ${job.title} na empresa ${job.companies.name}.`);
+      const whatsappUrl = `https://wa.me/55${whatsappNumber}?text=${message}`;
+      window.open(whatsappUrl, '_blank');
+    } else if (application_method === 'Email' && contact_info) {
+      const subject = encodeURIComponent(`Candidatura para vaga: ${job.title}`);
+      const body = encodeURIComponent(`Olá!\n\nGostaria de me candidatar para a vaga de ${job.title} na empresa ${job.companies.name}.\n\nAguardo retorno.\n\nAtenciosamente.`);
+      const emailUrl = `mailto:${contact_info}?subject=${subject}&body=${body}`;
+      window.open(emailUrl, '_blank');
+    } else if (application_method === 'Telefone' && contact_info) {
+      const phoneUrl = `tel:${contact_info}`;
+      window.open(phoneUrl, '_blank');
+    } else {
+      // Para outros métodos, mostrar informações em um toast
+      toast({
+        title: "📞 Informações de Contato",
+        description: `${application_method}: ${contact_info}`,
+      });
+    }
   };
 
   const closeApplicationForm = () => {
@@ -292,12 +320,33 @@ const JobList = () => {
                     )}
                   </div>
                   
-                  <Button 
-                    onClick={() => handleApplyJob(job)}
-                    className="w-full mt-6 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-semibold text-base md:text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
-                  >
-                    Candidatar-se Agora
-                  </Button>
+                  {/* Botões de Candidatura */}
+                  <div className="mt-6 space-y-3">
+                    {/* Candidatura pelo site (sempre disponível) */}
+                    <Button 
+                      onClick={() => handleApplyJob(job)}
+                      className="w-full h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-semibold text-base md:text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+                    >
+                      🌐 Candidatar-se pelo Site
+                    </Button>
+
+                    {/* Candidatura direta (se disponível) */}
+                    {job.has_external_application && job.application_method && job.contact_info && (
+                      <Button 
+                        onClick={() => handleDirectApplication(job)}
+                        variant="outline"
+                        className="w-full h-12 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 rounded-2xl font-semibold text-base md:text-lg transition-all duration-200"
+                      >
+                        {job.application_method === 'WhatsApp' && '📱 '}
+                        {job.application_method === 'Email' && '📧 '}
+                        {job.application_method === 'Telefone' && '📞 '}
+                        {job.application_method === 'Presencial' && '🏢 '}
+                        {job.application_method === 'Site' && '🌐 '}
+                        {job.application_method === 'Outro' && '🔗 '}
+                        Candidatar-se via {job.application_method}
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}

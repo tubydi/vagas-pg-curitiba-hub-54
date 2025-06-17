@@ -63,11 +63,20 @@ Extraia as informações e formate como JSON:
   "contract_type": "CLT (padrão se não especificado)",
   "work_mode": "Presencial (padrão se não especificado)",
   "experience_level": "Júnior (padrão se não especificado)",
-  "benefits": ["lista", "de", "benefícios", "mencionados"]
+  "benefits": ["lista", "de", "benefícios", "mencionados"],
+  "application_method": "Como se candidatar (WhatsApp, Email, Presencial, etc)",
+  "contact_info": "Informação de contato para candidatura (telefone, email, endereço, etc)",
+  "has_external_application": true/false (se há forma de candidatura externa)
 }
 
-IMPORTANTE:
-- Se houver múltiplas vagas no texto, escolha uma principal ou combine as informações
+IMPORTANTE - EXTRAÇÃO DE CONTATO:
+- Procure por números de WhatsApp, telefones, emails para envio de currículo
+- Identifique se é para entregar currículo presencialmente (endereço específico)
+- Procure instruções como "enviar currículo para", "candidatar-se via", "contato:"
+- Se encontrar contato específico, marque has_external_application como true
+- Se não encontrar contato específico, marque has_external_application como false
+
+REGRAS:
 - Para contract_type use apenas: "CLT", "PJ", "Freelancer", "Estágio"
 - Para work_mode use apenas: "Presencial", "Remoto", "Híbrido"  
 - Para experience_level use apenas: "Estagiário", "Júnior", "Pleno", "Sênior", "Especialista"
@@ -88,6 +97,9 @@ IMPORTANTE:
       extractedData.work_mode = extractedData.work_mode || 'Presencial';
       extractedData.experience_level = extractedData.experience_level || 'Júnior';
       extractedData.salary = extractedData.salary || 'A combinar';
+      extractedData.application_method = extractedData.application_method || '';
+      extractedData.contact_info = extractedData.contact_info || '';
+      extractedData.has_external_application = extractedData.has_external_application || false;
 
       onExtracted(extractedData);
       
@@ -138,10 +150,20 @@ Analise esta imagem de vaga de emprego e extraia as seguintes informações em f
   "contract_type": "tipo de contrato (CLT, PJ, Estágio, etc)",
   "work_mode": "modalidade (Presencial, Remoto, Híbrido)",
   "experience_level": "nível de experiência (Júnior, Pleno, Sênior, etc)",
-  "benefits": ["lista", "de", "benefícios"]
+  "benefits": ["lista", "de", "benefícios"],
+  "application_method": "Como se candidatar (WhatsApp, Email, Presencial, etc)",
+  "contact_info": "Informação de contato para candidatura (telefone, email, endereço, etc)",
+  "has_external_application": true/false (se há forma de candidatura externa)
 }
 
-IMPORTANTE:
+IMPORTANTE - EXTRAÇÃO DE CONTATO DA IMAGEM:
+- Procure por números de WhatsApp, telefones, emails para envio de currículo
+- Identifique se é para entregar currículo presencialmente (endereço específico)
+- Procure instruções como "enviar currículo para", "candidatar-se via", "contato:"
+- Se encontrar contato específico, marque has_external_application como true
+- Se não encontrar contato específico, marque has_external_application como false
+
+REGRAS:
 - Para contract_type use apenas: "CLT", "PJ", "Freelancer", "Estágio"
 - Para work_mode use apenas: "Presencial", "Remoto", "Híbrido"  
 - Para experience_level use apenas: "Estagiário", "Júnior", "Pleno", "Sênior", "Especialista"
@@ -169,6 +191,9 @@ IMPORTANTE:
           extractedData.work_mode = extractedData.work_mode || 'Presencial';
           extractedData.experience_level = extractedData.experience_level || 'Júnior';
           extractedData.salary = extractedData.salary || 'A combinar';
+          extractedData.application_method = extractedData.application_method || '';
+          extractedData.contact_info = extractedData.contact_info || '';
+          extractedData.has_external_application = extractedData.has_external_application || false;
 
           onExtracted(extractedData);
           
@@ -223,7 +248,7 @@ IMPORTANTE:
         <div className="space-y-6">
           <div className="text-center">
             <p className="text-gray-600 mb-4">
-              🚀 Cole o texto da vaga ou faça upload de uma imagem e a IA preencherá automaticamente todos os campos!
+              🚀 Cole o texto da vaga ou faça upload de uma imagem e a IA preencherá automaticamente todos os campos, incluindo informações de contato para candidatura!
             </p>
           </div>
 
@@ -325,6 +350,7 @@ IMPORTANTE:
             <ul className="text-sm text-blue-700 space-y-1">
               <li>• <strong>Texto:</strong> Cole o texto completo da vaga com todas as informações</li>
               <li>• <strong>Imagem:</strong> Use imagens nítidas e com texto legível</li>
+              <li>• <strong>Contatos:</strong> A IA identifica automaticamente WhatsApp, emails e telefones para candidatura</li>
               <li>• <strong>Formato:</strong> A IA reconhece emojis e formatação especial</li>
               <li>• <strong>Múltiplas vagas:</strong> Se o texto tiver várias vagas, a IA escolherá a principal</li>
             </ul>

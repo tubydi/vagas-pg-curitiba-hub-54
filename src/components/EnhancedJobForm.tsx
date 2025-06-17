@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Briefcase, X, Sparkles } from "lucide-react";
+import { Briefcase, X, Sparkles, Phone, Mail, MapPin } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import AIJobExtractor from "./AIJobExtractor";
 
@@ -30,6 +32,9 @@ interface Job {
   benefits: string[];
   status?: JobStatus;
   company_id: string;
+  application_method?: string;
+  contact_info?: string;
+  has_external_application?: boolean;
 }
 
 interface EnhancedJobFormProps {
@@ -51,6 +56,9 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
     experience_level: "Júnior" as ExperienceLevel,
     benefits: [],
     company_id: companyId,
+    application_method: "",
+    contact_info: "",
+    has_external_application: false,
   });
 
   const [newBenefit, setNewBenefit] = useState("");
@@ -61,7 +69,12 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
 
   useEffect(() => {
     if (job) {
-      setFormData(job);
+      setFormData({
+        ...job,
+        application_method: job.application_method || "",
+        contact_info: job.contact_info || "",
+        has_external_application: job.has_external_application || false,
+      });
     }
   }, [job]);
 
@@ -109,6 +122,23 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         errors.push(`Benefício ${index + 1}: ${benefitErrors.join(", ")}`);
       }
     });
+    
+    // Validar campos de candidatura se external application estiver ativa
+    if (formData.has_external_application) {
+      if (formData.application_method) {
+        const methodErrors = validateField(formData.application_method);
+        if (methodErrors.length > 0) {
+          errors.push(`Método de candidatura: ${methodErrors.join(", ")}`);
+        }
+      }
+      
+      if (formData.contact_info) {
+        const contactErrors = validateField(formData.contact_info);
+        if (contactErrors.length > 0) {
+          errors.push(`Informações de contato: ${contactErrors.join(", ")}`);
+        }
+      }
+    }
     
     setValidationErrors(errors);
     return errors.length === 0;
@@ -226,7 +256,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
     
     toast({
       title: "🤖 IA aplicada!",
-      description: "Dados extraídos e preenchidos automaticamente.",
+      description: "Dados extraídos e preenchidos automaticamente, incluindo informações de candidatura.",
     });
   };
 
@@ -397,6 +427,69 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
               className="min-h-[120px] rounded-xl"
               required
             />
+          </div>
+
+          {/* Seção de Candidatura Externa */}
+          <div className="space-y-4 bg-blue-50 p-6 rounded-xl border border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-lg font-semibold text-blue-900">📞 Candidatura Direta com a Empresa</Label>
+                <p className="text-sm text-blue-700 mt-1">
+                  Habilite para permitir que candidatos se candidatem diretamente via WhatsApp, email, etc.
+                </p>
+              </div>
+              <Switch
+                checked={formData.has_external_application || false}
+                onCheckedChange={(checked) => 
+                  setFormData(prev => ({ ...prev, has_external_application: checked }))
+                }
+              />
+            </div>
+
+            {formData.has_external_application && (
+              <div className="space-y-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="application_method">Método de Candidatura</Label>
+                    <Select
+                      value={formData.application_method || ""}
+                      onValueChange={(value) => 
+                        setFormData(prev => ({ ...prev, application_method: value }))
+                      }
+                    >
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Como se candidatar?" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="WhatsApp">📱 WhatsApp</SelectItem>
+                        <SelectItem value="Email">📧 Email</SelectItem>
+                        <SelectItem value="Telefone">📞 Telefone</SelectItem>
+                        <SelectItem value="Presencial">🏢 Entrega Presencial</SelectItem>
+                        <SelectItem value="Site">🌐 Site da Empresa</SelectItem>
+                        <SelectItem value="Outro">🔗 Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contact_info">Informações de Contato</Label>
+                    <Input
+                      id="contact_info"
+                      value={formData.contact_info || ""}
+                      onChange={(e) => setFormData(prev => ({ ...prev, contact_info: e.target.value }))}
+                      placeholder="WhatsApp, email, endereço, etc..."
+                      className="rounded-xl"
+                    />
+                  </div>
+                </div>
+                
+                <div className="bg-blue-100 p-3 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    💡 <strong>Dica:</strong> Quando ativado, os candidatos terão duas opções: se candidatar pelo site ou entrar em contato diretamente com sua empresa.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">

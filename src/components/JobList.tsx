@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, MapPin, Search, Clock, DollarSign, Users } from "lucide-react";
+import { Building2, MapPin, Search, Clock, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -61,10 +61,10 @@ const JobList = () => {
 
   const fetchJobs = async () => {
     try {
-      console.log('🔍 Fetching jobs... (PUBLIC ACCESS)');
+      console.log('🔍 Buscando vagas no banco... (ACESSO PÚBLICO)');
       setLoading(true);
       
-      // CRITICAL FIX: Remove authentication requirement and use public access
+      // Buscar vagas com política pública de acesso
       const { data, error } = await supabase
         .from('jobs')
         .select(`
@@ -73,14 +73,16 @@ const JobList = () => {
             id,
             name,
             city,
-            sector
+            sector,
+            email,
+            phone
           )
         `)
         .eq('status', 'Ativa')
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ Error fetching jobs:', error);
+        console.error('❌ Erro ao buscar vagas:', error);
         toast({
           title: "Erro ao carregar vagas",
           description: "Não foi possível carregar as vagas. Tente novamente.",
@@ -89,9 +91,10 @@ const JobList = () => {
         return;
       }
 
-      console.log('✅ Jobs fetched successfully:', data?.length || 0, 'jobs');
+      console.log('✅ Vagas encontradas:', data?.length || 0, 'vagas');
+      console.log('📋 Dados das vagas:', data);
       
-      // Map the data to ensure compatibility with our interface
+      // Mapear os dados para garantir compatibilidade
       const mappedJobs = (data || []).map(job => ({
         ...job,
         has_external_application: job.has_external_application || false,
@@ -101,7 +104,7 @@ const JobList = () => {
       
       setJobs(mappedJobs);
     } catch (error) {
-      console.error('❌ Error in fetchJobs:', error);
+      console.error('❌ Erro inesperado ao buscar vagas:', error);
       toast({
         title: "Erro inesperado",
         description: "Ocorreu um erro inesperado. Tente recarregar a página.",
@@ -125,7 +128,6 @@ const JobList = () => {
     const { application_method, contact_info } = job;
     
     if (application_method === 'WhatsApp' && contact_info) {
-      // Extrair apenas números do WhatsApp
       const whatsappNumber = contact_info.replace(/\D/g, '');
       const message = encodeURIComponent(`Olá! Gostaria de me candidatar para a vaga de ${job.title} na empresa ${job.companies.name}.`);
       const whatsappUrl = `https://wa.me/55${whatsappNumber}?text=${message}`;
@@ -139,7 +141,6 @@ const JobList = () => {
       const phoneUrl = `tel:${contact_info}`;
       window.open(phoneUrl, '_blank');
     } else {
-      // Para outros métodos, mostrar informações em um toast
       toast({
         title: "📞 Informações de Contato",
         description: `${application_method}: ${contact_info}`,
@@ -158,7 +159,6 @@ const JobList = () => {
       job.companies.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.description.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Filtro específico para Ponta Grossa e Curitiba
     const matchesCity = selectedCity === "all" || 
       (selectedCity === "ponta grossa" && (
         job.location.toLowerCase().includes("ponta grossa") ||
@@ -171,14 +171,6 @@ const JobList = () => {
     
     const matchesContract = selectedContract === "all" || 
       job.contract_type === selectedContract;
-
-    console.log('Filter debug:', {
-      jobLocation: job.location,
-      companiesCity: job.companies.city,
-      selectedCity,
-      matchesCity,
-      jobTitle: job.title
-    });
 
     return matchesSearch && matchesCity && matchesContract;
   });
@@ -254,7 +246,7 @@ const JobList = () => {
                 onClick={fetchJobs}
                 className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl w-full md:w-auto"
               >
-                Atualizar Vagas
+                🔄 Atualizar Vagas
               </Button>
             </div>
           </CardContent>
@@ -272,9 +264,14 @@ const JobList = () => {
           <Card className="border-0 shadow-lg rounded-3xl">
             <CardContent className="p-8 md:p-12 text-center">
               <Building2 className="h-12 md:h-16 w-12 md:w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl md:text-2xl font-bold text-gray-700 mb-2">Nenhuma vaga encontrada</h3>
+              <h3 className="text-xl md:text-2xl font-bold text-gray-700 mb-2">
+                {jobs.length === 0 ? "Nenhuma vaga no banco de dados" : "Nenhuma vaga encontrada"}
+              </h3>
               <p className="text-gray-500">
-                Tente ajustar os filtros de busca ou volte mais tarde para novas oportunidades.
+                {jobs.length === 0 
+                  ? "Ainda não há vagas cadastradas no sistema. Aguarde enquanto as empresas publicam suas oportunidades." 
+                  : "Tente ajustar os filtros de busca ou volte mais tarde para novas oportunidades."
+                }
               </p>
             </CardContent>
           </Card>

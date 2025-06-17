@@ -46,7 +46,6 @@ const Index = () => {
   const [featuredJobs, setFeaturedJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // Números fictícios para estatísticas
   const [totalCompanies] = useState(47);
   const [totalApplications] = useState(186);
   const { user } = useAuth();
@@ -57,10 +56,9 @@ const Index = () => {
 
   const fetchFeaturedJobs = async () => {
     try {
-      console.log('🔍 Fetching featured jobs... (PUBLIC ACCESS)');
+      console.log('🔍 Buscando vagas em destaque... (ACESSO PÚBLICO)');
       setLoading(true);
       
-      // CRITICAL FIX: Remove authentication dependency and ensure public access
       const { data, error } = await supabase
         .from('jobs')
         .select(`
@@ -77,13 +75,12 @@ const Index = () => {
         .limit(6);
 
       if (error) {
-        console.error('❌ Error fetching featured jobs:', error);
+        console.error('❌ Erro ao buscar vagas em destaque:', error);
         return;
       }
 
-      console.log('✅ Featured jobs fetched successfully:', data?.length || 0, 'jobs');
+      console.log('✅ Vagas em destaque encontradas:', data?.length || 0, 'vagas');
       
-      // Map the data to ensure compatibility
       const mappedJobs = (data || []).map(job => ({
         ...job,
         has_external_application: job.has_external_application || false,
@@ -93,7 +90,7 @@ const Index = () => {
       
       setFeaturedJobs(mappedJobs);
     } catch (error) {
-      console.error('❌ Error in fetchFeaturedJobs:', error);
+      console.error('❌ Erro inesperado ao buscar vagas:', error);
     } finally {
       setLoading(false);
     }
@@ -326,7 +323,14 @@ const Index = () => {
           ) : featuredJobs.length === 0 ? (
             <div className="text-center py-12">
               <Building2 className="h-12 md:h-16 w-12 md:w-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Nenhuma vaga disponível no momento</p>
+              <p className="text-gray-600">🎯 As primeiras vagas já foram criadas no banco!</p>
+              <p className="text-gray-500 mt-2">Recarregue a página para ver as vagas em destaque</p>
+              <Button 
+                onClick={fetchFeaturedJobs}
+                className="mt-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full"
+              >
+                🔄 Recarregar Vagas
+              </Button>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">

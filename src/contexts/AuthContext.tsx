@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -111,13 +112,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Attempting sign up for:', email);
       
-      // Criar usuário sem confirmação de email
+      // Criar usuário sem necessidade de confirmação de email
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/dashboard`,
           data: {
+            email_confirm: true,
             company_name: companyData?.companyName || '',
             cnpj: companyData?.cnpj || ''
           }
@@ -147,9 +149,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.user) {
         toast({
           title: "✅ Cadastro realizado!",
-          description: "Sua conta foi criada com sucesso. Você já pode fazer login!",
+          description: "Sua conta foi criada e ativada com sucesso!",
           duration: 5000,
         });
+        
+        // Confirmar email automaticamente através da API admin
+        try {
+          const { error: confirmError } = await supabase.auth.admin.updateUserById(
+            data.user.id,
+            { email_confirm: true }
+          );
+          
+          if (confirmError) {
+            console.error('Email confirmation error:', confirmError);
+          }
+        } catch (confirmError) {
+          console.error('Error confirming email:', confirmError);
+        }
         
         // Criar dados da empresa após o cadastro
         if (companyData) {
@@ -181,6 +197,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error('Error creating company:', companyCreationError);
           }
         }
+
+        // Fazer login automaticamente após cadastro
+        setTimeout(async () => {
+          const { error: loginError } = await signIn(email, password);
+          if (!loginError) {
+            console.log('Auto-login successful after signup');
+          }
+        }, 1000);
       }
 
       return { error: null };

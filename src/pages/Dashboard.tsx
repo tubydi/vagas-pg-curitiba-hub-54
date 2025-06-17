@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +27,12 @@ import AdminStats from "@/components/AdminStats";
 import AdminCompanies from "@/components/AdminCompanies";
 import AdminApplications from "@/components/AdminApplications";
 import { GeminiService } from "@/services/geminiService";
+import type { Database } from "@/integrations/supabase/types";
+
+type JobStatus = Database['public']['Enums']['job_status'];
+type ContractType = Database['public']['Enums']['contract_type'];
+type WorkMode = Database['public']['Enums']['work_mode'];
+type ExperienceLevel = Database['public']['Enums']['experience_level'];
 
 interface Company {
   id: string;
@@ -45,17 +50,17 @@ interface Company {
   updated_at: string;
 }
 
-interface Job {
+interface DashboardJob {
   id: string;
   title: string;
   description: string;
   requirements: string;
   salary: string;
   location: string;
-  contract_type: string;
-  work_mode: string;
-  experience_level: string;
-  status: string;
+  contract_type: ContractType;
+  work_mode: WorkMode;
+  experience_level: ExperienceLevel;
+  status: JobStatus;
   created_at: string;
   benefits: string[] | null;
   company_id: string;
@@ -67,10 +72,10 @@ const Dashboard = () => {
   const navigate = useNavigate();
   
   const [company, setCompany] = useState<Company | null>(null);
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<DashboardJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [showJobForm, setShowJobForm] = useState(false);
-  const [editingJob, setEditingJob] = useState<Job | null>(null);
+  const [editingJob, setEditingJob] = useState<DashboardJob | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [latestJobs, setLatestJobs] = useState<string>("");
   const [loadingLatestJobs, setLoadingLatestJobs] = useState(false);
@@ -183,7 +188,7 @@ const Dashboard = () => {
     fetchJobs();
   };
 
-  const handleEditJob = (job: Job) => {
+  const handleEditJob = (job: DashboardJob) => {
     setEditingJob(job);
     setShowJobForm(true);
   };

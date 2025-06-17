@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -227,7 +226,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
     
     toast({
       title: "🤖 IA aplicada!",
-      description: "Dados extraídos da imagem e preenchidos automaticamente.",
+      description: "Dados extraídos e preenchidos automaticamente.",
     });
   };
 
@@ -268,7 +267,10 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         {/* AI Extractor */}
         {showAIExtractor && (
           <div className="mb-6">
-            <AIJobExtractor onExtracted={handleAIExtraction} />
+            <AIJobExtractor 
+              onExtracted={handleAIExtraction} 
+              onClose={() => setShowAIExtractor(false)}
+            />
           </div>
         )}
 

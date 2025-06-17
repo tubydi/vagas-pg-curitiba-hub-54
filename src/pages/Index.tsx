@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +13,7 @@ import JobApplicationForm from "@/components/JobApplicationForm";
 const Index = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCity, setSelectedCity] = useState("all");
-  const [selectedJob, setSelectedJob] = useState<{id: string, title: string, company: string} | null>(null);
+  const [selectedJob, setSelectedJob] = useState<any | null>(null);
   const [isApplicationFormOpen, setIsApplicationFormOpen] = useState(false);
   const { user } = useAuth();
 
@@ -28,7 +29,23 @@ const Index = () => {
       workMode: "Híbrido",
       featured: true,
       description: "Desenvolvimento de aplicações web modernas com React e Node.js",
-      postedAt: "2 dias atrás"
+      postedAt: "2 dias atrás",
+      companies: {
+        id: "1",
+        name: "Tech PG",
+        email: "contato@techpg.com",
+        phone: "(42) 99999-9999",
+        cnpj: "12.345.678/0001-90",
+        address: "Rua das Flores, 123",
+        city: "Ponta Grossa",
+        sector: "Tecnologia",
+        legal_representative: "João Silva",
+        description: "Empresa de tecnologia",
+        status: "Ativa" as const,
+        user_id: "1",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
     },
     {
       id: "2",
@@ -40,7 +57,23 @@ const Index = () => {
       workMode: "Presencial",
       featured: true,
       description: "Gestão de campanhas digitais e análise de métricas",
-      postedAt: "1 dia atrás"
+      postedAt: "1 dia atrás",
+      companies: {
+        id: "2",
+        name: "Marketing Solutions",
+        email: "contato@marketing.com",
+        phone: "(41) 88888-8888",
+        cnpj: "98.765.432/0001-10",
+        address: "Av. Central, 456",
+        city: "Curitiba",
+        sector: "Marketing",
+        legal_representative: "Maria Santos",
+        description: "Agência de marketing",
+        status: "Ativa" as const,
+        user_id: "2",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
     },
     {
       id: "3",
@@ -52,7 +85,23 @@ const Index = () => {
       workMode: "Remoto",
       featured: false,
       description: "Criação de interfaces intuitivas e experiências digitais",
-      postedAt: "3 dias atrás"
+      postedAt: "3 dias atrás",
+      companies: {
+        id: "3",
+        name: "Creative Agency",
+        email: "contato@creative.com",
+        phone: "(42) 77777-7777",
+        cnpj: "11.222.333/0001-44",
+        address: "Rua Criativa, 789",
+        city: "Ponta Grossa",
+        sector: "Design",
+        legal_representative: "Carlos Design",
+        description: "Agência criativa",
+        status: "Ativa" as const,
+        user_id: "3",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
     },
     {
       id: "4",
@@ -64,12 +113,28 @@ const Index = () => {
       workMode: "Presencial",
       featured: false,
       description: "Prospecção de clientes e gestão de pipeline de vendas",
-      postedAt: "1 semana atrás"
+      postedAt: "1 semana atrás",
+      companies: {
+        id: "4",
+        name: "Vendas Plus",
+        email: "contato@vendas.com",
+        phone: "(41) 66666-6666",
+        cnpj: "55.666.777/0001-88",
+        address: "Rua Comercial, 321",
+        city: "Curitiba",
+        sector: "Vendas",
+        legal_representative: "Ana Vendas",
+        description: "Empresa de vendas",
+        status: "Ativa" as const,
+        user_id: "4",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
     }
   ];
 
-  const handleApplyJob = (jobId: string, jobTitle: string, companyName: string) => {
-    setSelectedJob({ id: jobId, title: jobTitle, company: companyName });
+  const handleApplyJob = (job: any) => {
+    setSelectedJob(job);
     setIsApplicationFormOpen(true);
   };
 
@@ -277,7 +342,7 @@ const Index = () => {
                   </div>
                   
                   <Button 
-                    onClick={() => handleApplyJob(job.id, job.title, job.company)}
+                    onClick={() => handleApplyJob(job)}
                     className="w-full mt-6 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
                   >
                     Candidatar-se Agora
@@ -341,14 +406,15 @@ const Index = () => {
       </footer>
 
       {/* Modal de Candidatura */}
-      {selectedJob && (
-        <JobApplicationForm
-          isOpen={isApplicationFormOpen}
-          onClose={closeApplicationForm}
-          jobId={selectedJob.id}
-          jobTitle={selectedJob.title}
-          companyName={selectedJob.company}
-        />
+      {selectedJob && isApplicationFormOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <JobApplicationForm
+              job={selectedJob}
+              onClose={closeApplicationForm}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

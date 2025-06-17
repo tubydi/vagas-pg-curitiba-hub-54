@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,60 +138,11 @@ const Auth = () => {
         return;
       }
 
-      // Aguardar criação do usuário
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Obter o usuário atual
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      
-      if (!currentUser) {
-        toast({
-          title: "Erro no cadastro",
-          description: "Erro ao obter dados do usuário. Tente fazer login.",
-          variant: "destructive"
-        });
-        setLoading(false);
-        return;
-      }
-
-      console.log('Creating company profile for user:', currentUser.id);
-
-      // Criar empresa no banco
-      const { error: companyError } = await supabase
-        .from('companies')
-        .insert({
-          user_id: currentUser.id,
-          name: companyData.companyName,
-          cnpj: companyData.cnpj.replace(/\D/g, ''),
-          email: companyData.email, // MESMO EMAIL usado no cadastro
-          phone: companyData.phone,
-          address: companyData.address,
-          city: companyData.city,
-          sector: companyData.sector,
-          legal_representative: companyData.legalRepresentative,
-          description: companyData.description || null,
-          status: 'Pendente'
-        });
-
-      if (companyError) {
-        console.error('Company creation error:', companyError);
-        toast({
-          title: "Erro no cadastro da empresa",
-          description: companyError.message.includes('duplicate') ? 
-            "Empresa já cadastrada." : 
-            "Erro ao cadastrar empresa. Tente novamente.",
-          variant: "destructive"
-        });
-        setLoading(false);
-        return;
-      }
-
-      console.log('Company created successfully');
-
+      // Mostrar mensagem de confirmação de email
       toast({
-        title: "✅ Cadastro realizado com sucesso!",
-        description: `Empresa "${companyData.companyName}" cadastrada. Use o email ${companyData.email} para fazer login.`,
-        duration: 6000, // 6 segundos para ler a mensagem
+        title: "📧 Confirme seu email!",
+        description: `Enviamos um email de confirmação para ${companyData.email}. Clique no link para ativar sua conta e depois faça login.`,
+        duration: 10000, // 10 segundos para ler
       });
 
       // Limpar formulário
@@ -209,11 +159,6 @@ const Auth = () => {
         confirmPassword: "",
         description: ""
       });
-
-      // Aguardar 2 segundos antes de redirecionar
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 2000);
 
     } catch (error) {
       console.error('Signup error:', error);

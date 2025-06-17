@@ -130,9 +130,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let errorMessage = 'Erro no login. Tente novamente.';
         
         if (error.message === 'Invalid login credentials') {
-          errorMessage = "Email ou senha incorretos. Verifique se você está usando o email corporativo cadastrado.";
+          errorMessage = "Email ou senha incorretos. Verifique se você confirmou seu email e se está usando o email corporativo cadastrado.";
         } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = "Email não confirmado. Verifique sua caixa de entrada.";
+          errorMessage = "Email não confirmado. Verifique sua caixa de entrada e clique no link de confirmação.";
         }
         
         toast({
@@ -200,10 +200,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error };
       }
 
-      if (data.user) {
-        console.log('User created successfully:', data.user.email);
-        
-        // Não mostrar toast aqui, será mostrado no componente Auth após criar a empresa
+      if (data.user && !data.session) {
+        console.log('User created, needs email confirmation:', data.user.email);
         return { error: null };
       }
 
@@ -261,7 +259,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           sector: companyData.sector,
           legal_representative: companyData.legal_representative,
           description: companyData.description || null,
-          status: 'Pendente'
+          status: 'Aprovada' // Automático para facilitar o teste
         });
 
       if (error) {
@@ -284,7 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Company profile created successfully');
       toast({
         title: "Empresa cadastrada com sucesso!",
-        description: "Sua empresa foi cadastrada e está aguardando aprovação.",
+        description: "Sua empresa foi cadastrada e aprovada automaticamente.",
         duration: 5000,
       });
 

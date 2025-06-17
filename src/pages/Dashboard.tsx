@@ -1,103 +1,265 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, Users, Briefcase, Plus, Eye, Edit, Trash2, LogOut, DollarSign, MapPin, Clock, Brain } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import JobForm from "@/components/JobForm";
 import CandidatesList from "@/components/CandidatesList";
 
 const Dashboard = () => {
   const [showJobForm, setShowJobForm] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
+  const [jobs, setJobs] = useState([]);
+  const [company, setCompany] = useState(null);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   
-  const [jobs, setJobs] = useState([
-    {
-      id: 1,
-      title: "Desenvolvedor Full Stack",
-      location: "Ponta Grossa",
-      salary: "R$ 8.000 - R$ 12.000",
-      type: "CLT",
-      workMode: "Híbrido",
-      status: "Ativa",
-      applicants: 15,
-      createdAt: "2024-01-15",
-      description: "Desenvolvimento de aplicações web modernas",
-      requirements: "React, Node.js, TypeScript",
-      benefits: ["Vale refeição", "Plano de saúde", "Home office"]
-    },
-    {
-      id: 2,
-      title: "Analista de Marketing",
-      location: "Curitiba",
-      salary: "R$ 5.000 - R$ 7.000",
-      type: "CLT",
-      workMode: "Presencial",
-      status: "Pausada",
-      applicants: 8,
-      createdAt: "2024-01-10",
-      description: "Gestão de campanhas digitais",
-      requirements: "Google Ads, Facebook Ads, Analytics",
-      benefits: ["Vale refeição", "Convênio médico"]
+  useEffect(() => {
+    if (user) {
+      fetchCompanyAndJobs();
     }
-  ]);
+  }, [user]);
 
-  const handleJobSubmit = (jobData: any) => {
-    if (editingJob) {
-      setJobs(jobs.map(job => 
-        job.id === editingJob.id 
-          ? { ...job, ...jobData, id: editingJob.id }
-          : job
-      ));
+  const fetchCompanyAndJobs = async () => {
+    try {
+      setLoading(true);
+      
+      // Buscar empresa do usuário logado
+      const { data: companyData, error: companyError } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (companyError && companyError.code !== 'PGRST116') {
+        console.error('Erro ao buscar empresa:', companyError);
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar dados da empresa.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!companyData) {
+        toast({
+          title: "Empresa não encontrada",
+          description: "Complete seu cadastro de empresa primeiro.",
+          variant: "destructive"
+        });
+        navigate("/auth");
+        return;
+      }
+
+      setCompany(companyData);
+
+      // Buscar vagas da empresa
+      const { data: jobsData, error: jobsError } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('company_id', companyData.id)
+        .order('created_at', { ascending: false });
+
+      if (jobsError) {
+        console.error('Erro ao buscar vagas:', jobsError);
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar vagas.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setJobs(jobsData || []);
+      
+    } catch (error) {
+      console.error('Erro geral:', error);
       toast({
-        title: "Vaga atualizada!",
-        description: "A vaga foi atualizada com sucesso.",
+        title: "Erro",
+        description: "Erro inesperado ao carregar dados.",
+        variant: "destructive"
       });
-      setEditingJob(null);
-    } else {
-      const newJob = {
-        id: Date.now(),
-        ...jobData,
-        status: "Ativa",
-        applicants: 0,
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-      setJobs([...jobs, newJob]);
-      toast({
-        title: "Vaga publicada!",
-        description: "Sua vaga foi publicada com sucesso.",
-      });
+    } finally {
+      setLoading(false);
     }
-    setShowJobForm(false);
   };
 
-  const handleEditJob = (job: any) => {
+  const handleJobSubmit = async (jobData) => {
+    try {
+      if (!company) {
+        toast({
+          title: "Erro",
+          description: "Empresa não encontrada.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (editingJob) {
+        // Atualizar vaga existente
+        const { error } = await supabase
+          .from('jobs')
+          .update(jobData)
+          .eq('id', editingJob.id)
+          .eq('company_id', company.id);
+
+        if (error) {
+          console.error('Erro ao atualizar vaga:', error);
+          toast({
+            title: "Erro",
+            description: "Erro ao atualizar vaga.",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        toast({
+          title: "Vaga atualizada!",
+          description: "A vaga foi atualizada com sucesso.",
+        });
+        setEditingJob(null);
+      } else {
+        // Criar nova vaga
+        const { error } = await supabase
+          .from('jobs')
+          .insert({
+            ...jobData,
+            company_id: company.id,
+            status: 'Ativa'
+          });
+
+        if (error) {
+          console.error('Erro ao criar vaga:', error);
+          toast({
+            title: "Erro",
+            description: "Erro ao criar vaga.",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        toast({
+          title: "Vaga criada!",
+          description: "Sua vaga foi criada com sucesso.",
+        });
+      }
+
+      setShowJobForm(false);
+      fetchCompanyAndJobs(); // Recarregar dados
+      
+    } catch (error) {
+      console.error('Erro ao salvar vaga:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao salvar vaga.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditJob = (job) => {
     setEditingJob(job);
     setShowJobForm(true);
   };
 
-  const handleDeleteJob = (jobId: number) => {
-    setJobs(jobs.filter(job => job.id !== jobId));
-    toast({
-      title: "Vaga removida",
-      description: "A vaga foi removida com sucesso.",
-    });
+  const handleDeleteJob = async (jobId) => {
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .delete()
+        .eq('id', jobId)
+        .eq('company_id', company.id);
+
+      if (error) {
+        console.error('Erro ao deletar vaga:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao deletar vaga.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Vaga removida",
+        description: "A vaga foi removida com sucesso.",
+      });
+      
+      fetchCompanyAndJobs(); // Recarregar dados
+      
+    } catch (error) {
+      console.error('Erro ao deletar vaga:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao deletar vaga.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const toggleJobStatus = (jobId: number) => {
-    setJobs(jobs.map(job => 
-      job.id === jobId 
-        ? { ...job, status: job.status === "Ativa" ? "Pausada" : "Ativa" }
-        : job
-    ));
-    toast({
-      title: "Status atualizado",
-      description: "O status da vaga foi atualizado.",
-    });
+  const toggleJobStatus = async (jobId) => {
+    try {
+      const job = jobs.find(j => j.id === jobId);
+      if (!job) return;
+
+      const newStatus = job.status === "Ativa" ? "Pausada" : "Ativa";
+
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: newStatus })
+        .eq('id', jobId)
+        .eq('company_id', company.id);
+
+      if (error) {
+        console.error('Erro ao atualizar status:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao atualizar status da vaga.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Status atualizado",
+        description: "O status da vaga foi atualizado.",
+      });
+      
+      fetchCompanyAndJobs(); // Recarregar dados
+      
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao atualizar status.",
+        variant: "destructive"
+      });
+    }
   };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-yellow-50 to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-yellow-50 to-green-50">
@@ -120,13 +282,13 @@ const Dashboard = () => {
                   VPG IA
                 </Button>
               </Link>
-              <span className="hidden md:block text-gray-700 font-medium bg-white px-4 py-2 rounded-full shadow-sm">Tech Solutions Ltda</span>
-              <Link to="/">
-                <Button variant="outline" size="sm" className="rounded-full">
-                  <LogOut className="w-4 h-4 mr-1 md:mr-2" />
-                  <span className="hidden md:inline">Sair</span>
-                </Button>
-              </Link>
+              <span className="hidden md:block text-gray-700 font-medium bg-white px-4 py-2 rounded-full shadow-sm">
+                {company?.name || "Carregando..."}
+              </span>
+              <Button onClick={handleSignOut} variant="outline" size="sm" className="rounded-full">
+                <LogOut className="w-4 h-4 mr-1 md:mr-2" />
+                <span className="hidden md:inline">Sair</span>
+              </Button>
             </div>
           </div>
         </div>
@@ -151,27 +313,29 @@ const Dashboard = () => {
 
           <Card className="animate-fade-in bg-gradient-to-br from-white to-yellow-50 border-0 shadow-lg rounded-2xl" style={{ animationDelay: "0.1s" }}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
-              <CardTitle className="text-xs md:text-sm font-medium text-gray-600">Candidatos</CardTitle>
+              <CardTitle className="text-xs md:text-sm font-medium text-gray-600">Total Vagas</CardTitle>
               <div className="bg-yellow-100 p-1 md:p-2 rounded-xl">
                 <Users className="h-3 w-3 md:h-5 md:w-5 text-yellow-600" />
               </div>
             </CardHeader>
             <CardContent className="p-3 md:p-6 pt-0">
               <div className="text-xl md:text-3xl font-bold text-yellow-600">
-                {jobs.reduce((total, job) => total + job.applicants, 0)}
+                {jobs.length}
               </div>
             </CardContent>
           </Card>
 
           <Card className="animate-fade-in bg-gradient-to-br from-white to-green-50 border-0 shadow-lg rounded-2xl" style={{ animationDelay: "0.2s" }}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
-              <CardTitle className="text-xs md:text-sm font-medium text-gray-600">Conversão</CardTitle>
+              <CardTitle className="text-xs md:text-sm font-medium text-gray-600">Pausadas</CardTitle>
               <div className="bg-green-100 p-1 md:p-2 rounded-xl">
                 <Building2 className="h-3 w-3 md:h-5 md:w-5 text-green-600" />
               </div>
             </CardHeader>
             <CardContent className="p-3 md:p-6 pt-0">
-              <div className="text-xl md:text-3xl font-bold text-green-600">12.5%</div>
+              <div className="text-xl md:text-3xl font-bold text-green-600">
+                {jobs.filter(job => job.status === "Pausada").length}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -223,80 +387,97 @@ const Dashboard = () => {
 
             {/* Jobs List - Mobile optimized */}
             <div className="space-y-4 md:space-y-6">
-              {jobs.map((job) => (
-                <Card key={job.id} className="hover:shadow-xl transition-all duration-300 bg-white rounded-3xl border-0 overflow-hidden">
-                  <CardContent className="p-4 md:p-8">
-                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mb-4">
-                          <h3 className="text-lg md:text-2xl font-bold text-gray-900">{job.title}</h3>
-                          <Badge 
-                            variant={job.status === "Ativa" ? "default" : "secondary"}
-                            className={`${
-                              job.status === "Ativa" 
-                                ? "bg-green-100 text-green-800 hover:bg-green-200" 
-                                : "bg-gray-100 text-gray-600"
-                            } rounded-full px-3 py-1 w-fit`}
-                          >
-                            {job.status}
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-6 mb-4">
-                          <div className="flex items-center text-gray-600 text-sm md:text-base">
-                            <MapPin className="w-4 h-4 md:w-5 md:h-5 mr-2 text-green-500" />
-                            <span>{job.location}</span>
-                          </div>
-                          <div className="flex items-center text-gray-600 text-sm md:text-base">
-                            <DollarSign className="w-4 h-4 md:w-5 md:h-5 mr-2 text-green-500" />
-                            <span className="font-semibold">{job.salary}</span>
-                          </div>
-                          <div className="flex items-center text-gray-600 text-sm md:text-base">
-                            <Building2 className="w-4 h-4 md:w-5 md:h-5 mr-2 text-green-500" />
-                            <span>{job.type} - {job.workMode}</span>
-                          </div>
-                          <div className="flex items-center text-gray-600 text-sm md:text-base">
-                            <Users className="w-4 h-4 md:w-5 md:h-5 mr-2 text-green-500" />
-                            <span className="font-semibold">{job.applicants} candidatos</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Clock className="w-4 h-4 mr-1" />
-                          Criada em {new Date(job.createdAt).toLocaleDateString('pt-BR')}
-                        </div>
-                      </div>
-                      
-                      <div className="flex flex-row md:flex-col items-center space-x-2 md:space-x-0 md:space-y-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => toggleJobStatus(job.id)}
-                          className="rounded-xl flex-1 md:flex-none"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleEditJob(job)}
-                          className="rounded-xl flex-1 md:flex-none"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleDeleteJob(job.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl flex-1 md:flex-none"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
+              {jobs.length === 0 ? (
+                <Card className="bg-white rounded-3xl border-0 shadow-lg">
+                  <CardContent className="p-8 text-center">
+                    <Briefcase className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhuma vaga cadastrada</h3>
+                    <p className="text-gray-600 mb-4">Crie sua primeira vaga para começar a receber candidatos!</p>
+                    <Button 
+                      onClick={() => setShowJobForm(true)}
+                      className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Criar Primeira Vaga
+                    </Button>
                   </CardContent>
                 </Card>
-              ))}
+              ) : (
+                jobs.map((job) => (
+                  <Card key={job.id} className="hover:shadow-xl transition-all duration-300 bg-white rounded-3xl border-0 overflow-hidden">
+                    <CardContent className="p-4 md:p-8">
+                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mb-4">
+                            <h3 className="text-lg md:text-2xl font-bold text-gray-900">{job.title}</h3>
+                            <Badge 
+                              variant={job.status === "Ativa" ? "default" : "secondary"}
+                              className={`${
+                                job.status === "Ativa" 
+                                  ? "bg-green-100 text-green-800 hover:bg-green-200" 
+                                  : "bg-gray-100 text-gray-600"
+                              } rounded-full px-3 py-1 w-fit`}
+                            >
+                              {job.status}
+                            </Badge>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-6 mb-4">
+                            <div className="flex items-center text-gray-600 text-sm md:text-base">
+                              <MapPin className="w-4 h-4 md:w-5 md:h-5 mr-2 text-green-500" />
+                              <span>{job.location}</span>
+                            </div>
+                            <div className="flex items-center text-gray-600 text-sm md:text-base">
+                              <DollarSign className="w-4 h-4 md:w-5 md:h-5 mr-2 text-green-500" />
+                              <span className="font-semibold">{job.salary}</span>
+                            </div>
+                            <div className="flex items-center text-gray-600 text-sm md:text-base">
+                              <Building2 className="w-4 h-4 md:w-5 md:h-5 mr-2 text-green-500" />
+                              <span>{job.contract_type} - {job.work_mode}</span>
+                            </div>
+                            <div className="flex items-center text-gray-600 text-sm md:text-base">
+                              <Users className="w-4 h-4 md:w-5 md:h-5 mr-2 text-green-500" />
+                              <span className="font-semibold">0 candidatos</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center text-sm text-gray-500">
+                            <Clock className="w-4 h-4 mr-1" />
+                            Criada em {new Date(job.created_at).toLocaleDateString('pt-BR')}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-row md:flex-col items-center space-x-2 md:space-x-0 md:space-y-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => toggleJobStatus(job.id)}
+                            className="rounded-xl flex-1 md:flex-none"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleEditJob(job)}
+                            className="rounded-xl flex-1 md:flex-none"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleDeleteJob(job.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl flex-1 md:flex-none"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           </TabsContent>
 

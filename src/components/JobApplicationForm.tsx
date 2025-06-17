@@ -1,91 +1,58 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { X, Upload, Plus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
+
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
+
+type Job = Database['public']['Tables']['jobs']['Row'] & {
+  companies: Database['public']['Tables']['companies']['Row'];
+};
 
 interface JobApplicationFormProps {
-  isOpen: boolean;
+  job: Job;
   onClose: () => void;
-  jobId: string;
-  jobTitle: string;
-  companyName: string;
 }
 
-type ApplicationInsert = Database["public"]["Tables"]["applications"]["Insert"];
-
-const JobApplicationForm = ({ isOpen, onClose, jobId, jobTitle, companyName }: JobApplicationFormProps) => {
-  const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [skills, setSkills] = useState<string[]>([]);
-  const [newSkill, setNewSkill] = useState("");
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
-
+const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose }) => {
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    linkedin: "",
-    experience_years: "",
-    current_position: "",
-    education: "",
-    cover_letter: ""
+    name: '',
+    email: '',
+    phone: '',
+    linkedin: '',
+    experience_years: '',
+    current_position: '',
+    education: '',
+    skills: '',
+    cover_letter: ''
   });
+  const [resume, setResume] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const addSkill = () => {
-    if (newSkill.trim() && !skills.includes(newSkill.trim())) {
-      setSkills([...skills, newSkill.trim()]);
-      setNewSkill("");
-    }
-  };
-
-  const removeSkill = (skillToRemove: string) => {
-    setSkills(skills.filter(skill => skill !== skillToRemove));
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Verificar se é PDF
-      if (file.type !== 'application/pdf') {
-        toast({
-          title: "Formato inválido",
-          description: "Por favor, envie apenas arquivos PDF.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Verificar tamanho (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "Arquivo muito grande",
-          description: "O arquivo deve ter no máximo 5MB.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      setResumeFile(file);
+  const handleResumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setResume(e.target.files[0]);
     }
   };
 
   const uploadResume = async (file: File): Promise<string | null> => {
     try {
-      const fileExt = 'pdf';
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `resumes/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('resumes')
@@ -96,7 +63,11 @@ const JobApplicationForm = ({ isOpen, onClose, jobId, jobTitle, companyName }: J
         return null;
       }
 
-      return filePath;
+      const { data } = supabase.storage
+        .from('resumes')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
     } catch (error) {
       console.error('Erro no upload do currículo:', error);
       return null;
@@ -105,302 +76,209 @@ const JobApplicationForm = ({ isOpen, onClose, jobId, jobTitle, companyName }: J
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    setLoading(true);
 
     try {
-      // Validações básicas
-      if (!formData.name || !formData.email || !formData.phone) {
-        toast({
-          title: "Campos obrigatórios",
-          description: "Por favor, preencha nome, email e telefone.",
-          variant: "destructive",
-        });
-        setIsSubmitting(false);
-        return;
-      }
-
+      console.log('Iniciando envio da candidatura...');
+      
       // Upload do currículo se fornecido
       let resumeUrl = null;
-      if (resumeFile) {
-        resumeUrl = await uploadResume(resumeFile);
+      if (resume) {
+        console.log('Fazendo upload do currículo...');
+        resumeUrl = await uploadResume(resume);
         if (!resumeUrl) {
-          toast({
-            title: "Erro no upload",
-            description: "Não foi possível fazer upload do currículo. Tente novamente.",
-            variant: "destructive",
-          });
-          setIsSubmitting(false);
-          return;
+          throw new Error('Falha no upload do currículo');
         }
+        console.log('Upload do currículo concluído:', resumeUrl);
       }
 
-      // Preparar dados da candidatura com tipos corretos
-      const applicationData: ApplicationInsert = {
-        job_id: jobId,
+      // Preparar dados para inserção
+      const skillsArray = formData.skills ? formData.skills.split(',').map(s => s.trim()) : [];
+      const experienceYears = formData.experience_years ? parseInt(formData.experience_years) : null;
+
+      const applicationData = {
+        job_id: job.id,
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
         linkedin: formData.linkedin || null,
-        experience_years: formData.experience_years ? parseInt(formData.experience_years) : null,
+        experience_years: experienceYears,
         current_position: formData.current_position || null,
         education: formData.education || null,
-        skills: skills.length > 0 ? skills : null,
+        skills: skillsArray.length > 0 ? skillsArray : null,
         cover_letter: formData.cover_letter || null,
         resume_url: resumeUrl,
-        status: "Novo"
+        status: 'Novo' as const
       };
 
       console.log('Dados da candidatura:', applicationData);
 
+      // Inserir candidatura no banco
       const { data, error } = await supabase
         .from('applications')
-        .insert(applicationData)
+        .insert([applicationData])
         .select();
 
       if (error) {
-        console.error('Erro ao enviar candidatura:', error);
-        toast({
-          title: "Erro ao enviar candidatura",
-          description: `Erro: ${error.message}`,
-          variant: "destructive",
-        });
-        setIsSubmitting(false);
-        return;
+        console.error('Erro ao inserir candidatura:', error);
+        throw error;
       }
 
-      console.log('Candidatura enviada com sucesso:', data);
+      console.log('Candidatura inserida com sucesso:', data);
 
       toast({
-        title: "Candidatura enviada com sucesso!",
-        description: `Sua candidatura para "${jobTitle}" na empresa ${companyName} foi enviada. A empresa entrará em contato em breve.`,
+        title: "Candidatura enviada!",
+        description: "Sua candidatura foi enviada com sucesso. A empresa entrará em contato em breve.",
       });
 
-      // Resetar formulário e fechar modal
-      setFormData({
-        name: "",
-        email: "",
-        phone: "",
-        linkedin: "",
-        experience_years: "",
-        current_position: "",
-        education: "",
-        cover_letter: ""
-      });
-      setSkills([]);
-      setResumeFile(null);
       onClose();
-
     } catch (error) {
-      console.error('Erro inesperado:', error);
+      console.error('Erro completo:', error);
       toast({
-        title: "Erro inesperado",
-        description: "Ocorreu um erro ao enviar a candidatura. Tente novamente.",
+        title: "Erro ao enviar candidatura",
+        description: error instanceof Error ? error.message : "Ocorreu um erro inesperado. Tente novamente.",
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-green-600">
-            Candidatar-se para {jobTitle}
-          </DialogTitle>
-          <p className="text-gray-600">Empresa: {companyName}</p>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Dados Pessoais */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Dados Pessoais</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Nome Completo *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  placeholder="Seu nome completo"
-                  required
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="seu@email.com"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="phone">Telefone *</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="(42) 99999-9999"
-                  required
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="linkedin">LinkedIn (opcional)</Label>
-                <Input
-                  id="linkedin"
-                  value={formData.linkedin}
-                  onChange={(e) => handleInputChange('linkedin', e.target.value)}
-                  placeholder="https://linkedin.com/in/seuperfil"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Experiência Profissional */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Experiência Profissional</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="experience_years">Anos de Experiência</Label>
-                <Select value={formData.experience_years} onValueChange={(value) => handleInputChange('experience_years', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">Sem experiência</SelectItem>
-                    <SelectItem value="1">1 ano</SelectItem>
-                    <SelectItem value="2">2 anos</SelectItem>
-                    <SelectItem value="3">3 anos</SelectItem>
-                    <SelectItem value="4">4 anos</SelectItem>
-                    <SelectItem value="5">5 anos</SelectItem>
-                    <SelectItem value="6">6+ anos</SelectItem>
-                    <SelectItem value="10">10+ anos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label htmlFor="current_position">Cargo Atual</Label>
-                <Input
-                  id="current_position"
-                  value={formData.current_position}
-                  onChange={(e) => handleInputChange('current_position', e.target.value)}
-                  placeholder="Seu cargo atual"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="education">Formação Acadêmica</Label>
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle>Candidatar-se para {job.title}</CardTitle>
+        <CardDescription>
+          {job.companies.name} - {job.location}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome Completo *</Label>
               <Input
-                id="education"
-                value={formData.education}
-                onChange={(e) => handleInputChange('education', e.target.value)}
-                placeholder="Ex: Graduação em Engenharia de Software - UEPG"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email *</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                required
               />
             </div>
           </div>
 
-          {/* Habilidades */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Habilidades</h3>
-            
-            <div className="flex gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="phone">Telefone *</Label>
               <Input
-                value={newSkill}
-                onChange={(e) => setNewSkill(e.target.value)}
-                placeholder="Digite uma habilidade"
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill())}
+                id="phone"
+                name="phone"
+                value={formData.phone}
+                onChange={handleInputChange}
+                required
               />
-              <Button type="button" onClick={addSkill} size="sm">
-                <Plus className="w-4 h-4" />
-              </Button>
             </div>
-            
-            <div className="flex flex-wrap gap-2">
-              {skills.map((skill, index) => (
-                <Badge key={index} variant="secondary" className="px-3 py-1">
-                  {skill}
-                  <X 
-                    className="w-3 h-3 ml-2 cursor-pointer" 
-                    onClick={() => removeSkill(skill)}
-                  />
-                </Badge>
-              ))}
+            <div className="space-y-2">
+              <Label htmlFor="linkedin">LinkedIn</Label>
+              <Input
+                id="linkedin"
+                name="linkedin"
+                value={formData.linkedin}
+                onChange={handleInputChange}
+                placeholder="https://linkedin.com/in/seuperfil"
+              />
             </div>
           </div>
 
-          {/* Carta de Apresentação */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Carta de Apresentação</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="experience_years">Anos de Experiência</Label>
+              <Input
+                id="experience_years"
+                name="experience_years"
+                type="number"
+                min="0"
+                value={formData.experience_years}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="current_position">Cargo Atual</Label>
+              <Input
+                id="current_position"
+                name="current_position"
+                value={formData.current_position}
+                onChange={handleInputChange}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="education">Formação</Label>
+            <Input
+              id="education"
+              name="education"
+              value={formData.education}
+              onChange={handleInputChange}
+              placeholder="Ex: Graduação em Engenharia de Software"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="skills">Habilidades</Label>
+            <Input
+              id="skills"
+              name="skills"
+              value={formData.skills}
+              onChange={handleInputChange}
+              placeholder="Ex: JavaScript, React, Node.js (separar por vírgula)"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="resume">Currículo (PDF)</Label>
+            <Input
+              id="resume"
+              type="file"
+              accept=".pdf,.doc,.docx"
+              onChange={handleResumeChange}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="cover_letter">Carta de Apresentação</Label>
             <Textarea
+              id="cover_letter"
+              name="cover_letter"
               value={formData.cover_letter}
-              onChange={(e) => handleInputChange('cover_letter', e.target.value)}
-              placeholder="Conte um pouco sobre você e por que se interessa por esta vaga..."
+              onChange={handleInputChange}
+              placeholder="Escreva uma breve apresentação sobre você e por que se interessa por esta vaga..."
               rows={4}
             />
           </div>
 
-          {/* Upload de Currículo */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Currículo (PDF)</h3>
-            
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-              <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-              <Label htmlFor="resume" className="cursor-pointer">
-                <span className="text-green-600 hover:text-green-700">
-                  Clique para enviar seu currículo (PDF)
-                </span>
-                <Input
-                  id="resume"
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </Label>
-              <p className="text-sm text-gray-500 mt-1">Máximo 5MB</p>
-              {resumeFile && (
-                <p className="text-sm text-green-600 mt-2">
-                  Arquivo selecionado: {resumeFile.name}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Botões */}
-          <div className="flex gap-4 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="flex-1"
-              disabled={isSubmitting}
-            >
-              Cancelar
+          <div className="flex gap-2 pt-4">
+            <Button type="submit" disabled={loading} className="flex-1">
+              {loading ? 'Enviando...' : 'Enviar Candidatura'}
             </Button>
-            <Button
-              type="submit"
-              className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Enviando..." : "Enviar Candidatura"}
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CardContent>
+    </Card>
   );
 };
 

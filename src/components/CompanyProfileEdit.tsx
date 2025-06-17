@@ -1,17 +1,16 @@
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Building2, Save, Edit3 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { Building2, Save } from "lucide-react";
 
-interface CompanyData {
+interface Company {
   id: string;
   name: string;
   cnpj: string;
@@ -28,19 +27,9 @@ interface CompanyData {
 const CompanyProfileEdit = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [companyData, setCompanyData] = useState<CompanyData | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    city: "",
-    sector: "",
-    legal_representative: "",
-    description: "",
-  });
+  const [company, setCompany] = useState<Company | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -50,7 +39,6 @@ const CompanyProfileEdit = () => {
 
   const fetchCompanyData = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('companies')
         .select('*')
@@ -58,21 +46,11 @@ const CompanyProfileEdit = () => {
         .single();
 
       if (error) {
-        console.error('Error fetching company data:', error);
+        console.error('Error fetching company:', error);
         return;
       }
 
-      setCompanyData(data);
-      setFormData({
-        name: data.name || "",
-        email: data.email || "",
-        phone: data.phone || "",
-        address: data.address || "",
-        city: data.city || "",
-        sector: data.sector || "",
-        legal_representative: data.legal_representative || "",
-        description: data.description || "",
-      });
+      setCompany(data);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -80,30 +58,25 @@ const CompanyProfileEdit = () => {
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
   const handleSave = async () => {
-    if (!companyData) return;
+    if (!company) return;
 
     try {
-      setLoading(true);
-
+      setSaving(true);
+      
       const { error } = await supabase
         .from('companies')
         .update({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          sector: formData.sector,
-          legal_representative: formData.legal_representative,
-          description: formData.description,
-          updated_at: new Date().toISOString(),
+          name: company.name,
+          email: company.email,
+          phone: company.phone,
+          address: company.address,
+          city: company.city,
+          sector: company.sector,
+          legal_representative: company.legal_representative,
+          description: company.description,
         })
-        .eq('id', companyData.id);
+        .eq('id', company.id);
 
       if (error) {
         console.error('Error updating company:', error);
@@ -116,233 +89,159 @@ const CompanyProfileEdit = () => {
       }
 
       toast({
-        title: "✅ Sucesso!",
+        title: "Sucesso",
         description: "Informações da empresa atualizadas com sucesso.",
       });
-
-      setIsEditing(false);
-      fetchCompanyData();
     } catch (error) {
       console.error('Error:', error);
-      toast({
-        title: "Erro",
-        description: "Erro inesperado ao atualizar.",
-        variant: "destructive",
-      });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (loading && !companyData) {
+  if (loading) {
     return (
-      <Card className="border-0 rounded-3xl shadow-2xl">
-        <CardContent className="p-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Carregando informações da empresa...</p>
-          </div>
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+        <p className="mt-4 text-gray-600">Carregando informações...</p>
+      </div>
+    );
+  }
+
+  if (!company) {
+    return (
+      <Card className="border-0 rounded-3xl shadow-lg">
+        <CardContent className="p-8 text-center">
+          <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-gray-700 mb-2">Empresa não encontrada</h3>
+          <p className="text-gray-500">
+            Não foi possível carregar as informações da empresa.
+          </p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="border-0 rounded-3xl shadow-2xl">
+    <Card className="border-0 rounded-3xl shadow-lg">
       <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-3xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Building2 className="h-8 w-8" />
-            <CardTitle className="text-2xl font-bold">
-              Informações da Empresa
-            </CardTitle>
-          </div>
-          {!isEditing ? (
-            <Button
-              onClick={() => setIsEditing(true)}
-              variant="outline"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-            >
-              <Edit3 className="w-4 h-4 mr-2" />
-              Editar
-            </Button>
-          ) : (
-            <div className="flex space-x-2">
-              <Button
-                onClick={handleSave}
-                disabled={loading}
-                variant="outline"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {loading ? "Salvando..." : "Salvar"}
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsEditing(false);
-                  if (companyData) {
-                    setFormData({
-                      name: companyData.name || "",
-                      email: companyData.email || "",
-                      phone: companyData.phone || "",
-                      address: companyData.address || "",
-                      city: companyData.city || "",
-                      sector: companyData.sector || "",
-                      legal_representative: companyData.legal_representative || "",
-                      description: companyData.description || "",
-                    });
-                  }
-                }}
-                variant="outline"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-              >
-                Cancelar
-              </Button>
-            </div>
-          )}
-        </div>
+        <CardTitle className="text-xl md:text-2xl font-bold flex items-center">
+          <Building2 className="h-6 md:h-8 w-6 md:w-8 mr-3" />
+          Informações da Empresa
+        </CardTitle>
+        <CardDescription className="text-green-100">
+          Atualize os dados da sua empresa
+        </CardDescription>
       </CardHeader>
       
-      <CardContent className="p-8">
+      <CardContent className="p-6 md:p-8 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="name" className="text-base font-semibold">Nome da Empresa</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
-                disabled={!isEditing}
-                className="mt-2 h-12 rounded-xl"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="cnpj" className="text-base font-semibold">CNPJ</Label>
-              <Input
-                id="cnpj"
-                value={companyData?.cnpj || ""}
-                disabled
-                className="mt-2 h-12 rounded-xl bg-gray-100"
-              />
-              <p className="text-sm text-gray-500 mt-1">CNPJ não pode ser alterado</p>
-            </div>
-
-            <div>
-              <Label htmlFor="email" className="text-base font-semibold">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange("email", e.target.value)}
-                disabled={!isEditing}
-                className="mt-2 h-12 rounded-xl"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="phone" className="text-base font-semibold">Telefone</Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => handleInputChange("phone", e.target.value)}
-                disabled={!isEditing}
-                className="mt-2 h-12 rounded-xl"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="legal_representative" className="text-base font-semibold">Representante Legal</Label>
-              <Input
-                id="legal_representative"
-                value={formData.legal_representative}
-                onChange={(e) => handleInputChange("legal_representative", e.target.value)}
-                disabled={!isEditing}
-                className="mt-2 h-12 rounded-xl"
-              />
-            </div>
+          <div>
+            <Label htmlFor="name">Nome da Empresa</Label>
+            <Input
+              id="name"
+              value={company.name}
+              onChange={(e) => setCompany({...company, name: e.target.value})}
+              className="rounded-xl"
+            />
           </div>
-
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="address" className="text-base font-semibold">Endereço</Label>
-              <Input
-                id="address"
-                value={formData.address}
-                onChange={(e) => handleInputChange("address", e.target.value)}
-                disabled={!isEditing}
-                className="mt-2 h-12 rounded-xl"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="city" className="text-base font-semibold">Cidade</Label>
-              <Select 
-                value={formData.city} 
-                onValueChange={(value) => handleInputChange("city", value)}
-                disabled={!isEditing}
-              >
-                <SelectTrigger className="mt-2 h-12 rounded-xl">
-                  <SelectValue placeholder="Selecione a cidade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Ponta Grossa">Ponta Grossa</SelectItem>
-                  <SelectItem value="Curitiba">Curitiba</SelectItem>
-                  <SelectItem value="Castro">Castro</SelectItem>
-                  <SelectItem value="Carambeí">Carambeí</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="sector" className="text-base font-semibold">Setor</Label>
-              <Select 
-                value={formData.sector} 
-                onValueChange={(value) => handleInputChange("sector", value)}
-                disabled={!isEditing}
-              >
-                <SelectTrigger className="mt-2 h-12 rounded-xl">
-                  <SelectValue placeholder="Selecione o setor" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Tecnologia">Tecnologia</SelectItem>
-                  <SelectItem value="Saúde">Saúde</SelectItem>
-                  <SelectItem value="Educação">Educação</SelectItem>
-                  <SelectItem value="Varejo">Varejo</SelectItem>
-                  <SelectItem value="Indústria">Indústria</SelectItem>
-                  <SelectItem value="Serviços">Serviços</SelectItem>
-                  <SelectItem value="Agricultura">Agricultura</SelectItem>
-                  <SelectItem value="Outros">Outros</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="description" className="text-base font-semibold">Descrição da Empresa</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => handleInputChange("description", e.target.value)}
-                disabled={!isEditing}
-                placeholder="Descreva sua empresa, valores e atividades..."
-                className="mt-2 h-24 rounded-xl"
-              />
-            </div>
-
-            <div>
-              <Label className="text-base font-semibold">Status da Empresa</Label>
-              <div className="mt-2">
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  companyData?.status === 'Ativa' 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {companyData?.status || 'Pendente'}
-                </span>
-              </div>
-            </div>
+          
+          <div>
+            <Label htmlFor="cnpj">CNPJ</Label>
+            <Input
+              id="cnpj"
+              value={company.cnpj}
+              disabled
+              className="rounded-xl bg-gray-100"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={company.email}
+              onChange={(e) => setCompany({...company, email: e.target.value})}
+              className="rounded-xl"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="phone">Telefone</Label>
+            <Input
+              id="phone"
+              value={company.phone}
+              onChange={(e) => setCompany({...company, phone: e.target.value})}
+              className="rounded-xl"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="city">Cidade</Label>
+            <Input
+              id="city"
+              value={company.city}
+              onChange={(e) => setCompany({...company, city: e.target.value})}
+              className="rounded-xl"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="sector">Setor</Label>
+            <Input
+              id="sector"
+              value={company.sector}
+              onChange={(e) => setCompany({...company, sector: e.target.value})}
+              className="rounded-xl"
+            />
           </div>
         </div>
+        
+        <div>
+          <Label htmlFor="address">Endereço</Label>
+          <Input
+            id="address"
+            value={company.address}
+            onChange={(e) => setCompany({...company, address: e.target.value})}
+            className="rounded-xl"
+          />
+        </div>
+        
+        <div>
+          <Label htmlFor="legal_representative">Representante Legal</Label>
+          <Input
+            id="legal_representative"
+            value={company.legal_representative}
+            onChange={(e) => setCompany({...company, legal_representative: e.target.value})}
+            className="rounded-xl"
+          />
+        </div>
+        
+        <div>
+          <Label htmlFor="description">Descrição da Empresa</Label>
+          <Textarea
+            id="description"
+            value={company.description}
+            onChange={(e) => setCompany({...company, description: e.target.value})}
+            className="rounded-xl"
+            rows={4}
+            placeholder="Descreva sua empresa..."
+          />
+        </div>
+        
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-2xl h-12"
+        >
+          {saving ? (
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
+          ) : (
+            <Save className="w-5 h-5 mr-2" />
+          )}
+          {saving ? 'Salvando...' : 'Salvar Alterações'}
+        </Button>
       </CardContent>
     </Card>
   );

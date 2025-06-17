@@ -16,10 +16,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('ProtectedRoute - User:', user?.email, 'IsAdmin:', isAdmin, 'RequireAdmin:', requireAdmin, 'Loading:', loading);
+    
     if (!loading) {
       if (!user) {
+        console.log('No user, redirecting to auth');
         navigate("/auth");
       } else if (requireAdmin && !isAdmin) {
+        console.log('Admin required but user is not admin, redirecting to dashboard');
         navigate("/dashboard");
       }
     }
@@ -36,6 +40,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
+  // Se não tem usuário ou se precisa de admin mas não é admin, não renderiza nada
   if (!user || (requireAdmin && !isAdmin)) {
     return null;
   }

@@ -35,37 +35,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
+        console.log('Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
           // Check admin status
-          setTimeout(async () => {
-            try {
-              console.log('Checking admin status for user:', session.user.id);
-              
-              // Verificar se é o admin específico
-              if (session.user.email === 'admin@vagaspg.com') {
-                console.log('User is admin by email');
-                setIsAdmin(true);
-                return;
-              }
-              
-              // Verificar na tabela profiles
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('role')
-                .eq('id', session.user.id)
-                .maybeSingle();
-              
-              console.log('User profile:', profile);
-              setIsAdmin(profile?.role === 'admin');
-            } catch (error) {
-              console.error('Error checking admin status:', error);
-              setIsAdmin(false);
-            }
-          }, 100);
+          const isAdminUser = session.user.email === 'admin@vagaspg.com';
+          console.log('Setting admin status:', isAdminUser, 'for user:', session.user.email);
+          setIsAdmin(isAdminUser);
         } else {
           setIsAdmin(false);
         }
@@ -76,8 +54,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        const isAdminUser = session.user.email === 'admin@vagaspg.com';
+        console.log('Initial admin check:', isAdminUser, 'for user:', session.user.email);
+        setIsAdmin(isAdminUser);
+      }
+      
       setLoading(false);
     });
 
@@ -109,12 +95,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.user) {
         console.log('Login successful for:', email);
         
-        // Verificar se é admin
-        if (email === 'admin@vagaspg.com') {
-          console.log('Admin user logged in');
-          setIsAdmin(true);
-        }
-        
         toast({
           title: "Login realizado",
           description: "Bem-vindo de volta!",
@@ -132,12 +112,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Attempting sign up for:', email);
       
-      // Criar usuário SEM confirmação de email - usando service role key internamente
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          // Não definir emailRedirectTo para evitar envio de email
           data: {
             company_name: companyData?.companyName || '',
             cnpj: companyData?.cnpj || ''
@@ -167,7 +145,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.user) {
         console.log('User created successfully:', data.user.id);
         
-        // Criar dados da empresa
         if (companyData) {
           console.log('Creating company data for user:', data.user.id);
           
@@ -204,7 +181,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           duration: 5000,
         });
 
-        // Tentar fazer login automaticamente após alguns segundos
         setTimeout(async () => {
           console.log('Attempting auto-login after signup...');
           const { error: loginError } = await signIn(email, password);
@@ -237,7 +213,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
 
-      // Force clear all local state
       setUser(null);
       setSession(null);
       setIsAdmin(false);

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +13,6 @@ import {
   Plus, 
   Settings, 
   BarChart3,
-  Eye,
   Edit,
   Trash2,
   User,
@@ -21,8 +21,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import JobForm from "@/components/JobForm";
-import CompanyStats from "@/components/CompanyStats";
-import CandidatesList from "@/components/CandidatesList";
 import CompanyProfileEdit from "@/components/CompanyProfileEdit";
 
 interface Company {
@@ -100,7 +98,6 @@ const Dashboard = () => {
       setLoading(true);
 
       if (!company) {
-        // Se ainda não temos os dados da empresa, vamos buscar primeiro
         const { data: companyData } = await supabase
           .from('companies')
           .select('id')
@@ -242,7 +239,7 @@ const Dashboard = () => {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-          <TabsList className="grid w-full grid-cols-5 bg-white/50 backdrop-blur-md rounded-2xl p-2 overflow-x-auto">
+          <TabsList className="grid w-full grid-cols-4 bg-white/50 backdrop-blur-md rounded-2xl p-2 overflow-x-auto">
             <TabsTrigger value="overview" className="rounded-xl text-xs md:text-sm">
               <BarChart3 className="w-4 h-4 mr-1 md:mr-2" />
               <span className="hidden sm:inline">Visão Geral</span>
@@ -251,11 +248,6 @@ const Dashboard = () => {
             <TabsTrigger value="jobs" className="rounded-xl text-xs md:text-sm">
               <Briefcase className="w-4 h-4 mr-1 md:mr-2" />
               Vagas
-            </TabsTrigger>
-            <TabsTrigger value="candidates" className="rounded-xl text-xs md:text-sm">
-              <Users className="w-4 h-4 mr-1 md:mr-2" />
-              <span className="hidden sm:inline">Candidatos</span>
-              <span className="sm:hidden">Cand.</span>
             </TabsTrigger>
             <TabsTrigger value="profile" className="rounded-xl text-xs md:text-sm">
               <User className="w-4 h-4 mr-1 md:mr-2" />
@@ -269,7 +261,48 @@ const Dashboard = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <CompanyStats companyId={company?.id || ''} />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="border-0 rounded-3xl shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-3xl">
+                  <CardTitle className="text-lg font-bold flex items-center">
+                    <Briefcase className="h-5 w-5 mr-2" />
+                    Total de Vagas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="text-3xl font-bold text-blue-600">{jobs.length}</div>
+                  <p className="text-sm text-gray-600">Vagas publicadas</p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 rounded-3xl shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-3xl">
+                  <CardTitle className="text-lg font-bold flex items-center">
+                    <Users className="h-5 w-5 mr-2" />
+                    Vagas Ativas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="text-3xl font-bold text-green-600">
+                    {jobs.filter(job => job.status === 'Ativa').length}
+                  </div>
+                  <p className="text-sm text-gray-600">Recebendo candidaturas</p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 rounded-3xl shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-t-3xl">
+                  <CardTitle className="text-lg font-bold flex items-center">
+                    <Building2 className="h-5 w-5 mr-2" />
+                    Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="text-2xl font-bold text-purple-600">{company?.status}</div>
+                  <p className="text-sm text-gray-600">Status da empresa</p>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="jobs" className="space-y-6">
@@ -370,10 +403,6 @@ const Dashboard = () => {
                 ))
               )}
             </div>
-          </TabsContent>
-
-          <TabsContent value="candidates" className="space-y-6">
-            <CandidatesList companyId={company?.id || ''} />
           </TabsContent>
 
           <TabsContent value="profile" className="space-y-6">

@@ -9,7 +9,244 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      applications: {
+        Row: {
+          cover_letter: string | null
+          created_at: string
+          current_position: string | null
+          education: string | null
+          email: string
+          experience_years: number | null
+          id: string
+          job_id: string
+          linkedin: string | null
+          name: string
+          phone: string
+          resume_url: string | null
+          skills: string[] | null
+          status: Database["public"]["Enums"]["application_status"]
+          updated_at: string
+        }
+        Insert: {
+          cover_letter?: string | null
+          created_at?: string
+          current_position?: string | null
+          education?: string | null
+          email: string
+          experience_years?: number | null
+          id?: string
+          job_id: string
+          linkedin?: string | null
+          name: string
+          phone: string
+          resume_url?: string | null
+          skills?: string[] | null
+          status?: Database["public"]["Enums"]["application_status"]
+          updated_at?: string
+        }
+        Update: {
+          cover_letter?: string | null
+          created_at?: string
+          current_position?: string | null
+          education?: string | null
+          email?: string
+          experience_years?: number | null
+          id?: string
+          job_id?: string
+          linkedin?: string | null
+          name?: string
+          phone?: string
+          resume_url?: string | null
+          skills?: string[] | null
+          status?: Database["public"]["Enums"]["application_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          address: string
+          city: string
+          cnpj: string
+          created_at: string
+          description: string | null
+          email: string
+          id: string
+          legal_representative: string
+          name: string
+          phone: string
+          sector: string
+          status: Database["public"]["Enums"]["company_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          city: string
+          cnpj: string
+          created_at?: string
+          description?: string | null
+          email: string
+          id?: string
+          legal_representative: string
+          name: string
+          phone: string
+          sector: string
+          status?: Database["public"]["Enums"]["company_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          city?: string
+          cnpj?: string
+          created_at?: string
+          description?: string | null
+          email?: string
+          id?: string
+          legal_representative?: string
+          name?: string
+          phone?: string
+          sector?: string
+          status?: Database["public"]["Enums"]["company_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      jobs: {
+        Row: {
+          benefits: string[] | null
+          company_id: string
+          contract_type: Database["public"]["Enums"]["contract_type"]
+          created_at: string
+          description: string
+          experience_level: Database["public"]["Enums"]["experience_level"]
+          id: string
+          location: string
+          requirements: string
+          salary: string
+          status: Database["public"]["Enums"]["job_status"]
+          title: string
+          updated_at: string
+          work_mode: Database["public"]["Enums"]["work_mode"]
+        }
+        Insert: {
+          benefits?: string[] | null
+          company_id: string
+          contract_type: Database["public"]["Enums"]["contract_type"]
+          created_at?: string
+          description: string
+          experience_level: Database["public"]["Enums"]["experience_level"]
+          id?: string
+          location: string
+          requirements: string
+          salary: string
+          status?: Database["public"]["Enums"]["job_status"]
+          title: string
+          updated_at?: string
+          work_mode: Database["public"]["Enums"]["work_mode"]
+        }
+        Update: {
+          benefits?: string[] | null
+          company_id?: string
+          contract_type?: Database["public"]["Enums"]["contract_type"]
+          created_at?: string
+          description?: string
+          experience_level?: Database["public"]["Enums"]["experience_level"]
+          id?: string
+          location?: string
+          requirements?: string
+          salary?: string
+          status?: Database["public"]["Enums"]["job_status"]
+          title?: string
+          updated_at?: string
+          work_mode?: Database["public"]["Enums"]["work_mode"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          application_id: string
+          company_id: string
+          created_at: string
+          id: string
+          message: string
+          read: boolean
+        }
+        Insert: {
+          application_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          message: string
+          read?: boolean
+        }
+        Update: {
+          application_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          read?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +255,23 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      application_status:
+        | "Novo"
+        | "Visualizado"
+        | "Contato"
+        | "Rejeitado"
+        | "Aprovado"
+      company_status: "Ativa" | "Pendente" | "Bloqueada"
+      contract_type: "CLT" | "PJ" | "Freelancer" | "Estágio"
+      experience_level:
+        | "Estagiário"
+        | "Júnior"
+        | "Pleno"
+        | "Sênior"
+        | "Especialista"
+      job_status: "Ativa" | "Pausada" | "Fechada"
+      user_role: "admin" | "company"
+      work_mode: "Presencial" | "Remoto" | "Híbrido"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +386,26 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      application_status: [
+        "Novo",
+        "Visualizado",
+        "Contato",
+        "Rejeitado",
+        "Aprovado",
+      ],
+      company_status: ["Ativa", "Pendente", "Bloqueada"],
+      contract_type: ["CLT", "PJ", "Freelancer", "Estágio"],
+      experience_level: [
+        "Estagiário",
+        "Júnior",
+        "Pleno",
+        "Sênior",
+        "Especialista",
+      ],
+      job_status: ["Ativa", "Pausada", "Fechada"],
+      user_role: ["admin", "company"],
+      work_mode: ["Presencial", "Remoto", "Híbrido"],
+    },
   },
 } as const

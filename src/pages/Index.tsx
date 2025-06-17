@@ -8,11 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Building2, MapPin, Search, Users, TrendingUp, Star, Clock, DollarSign, Brain, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCity, setSelectedCity] = useState("all");
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Mock data para demonstração
   const featuredJobs = [
@@ -94,16 +96,26 @@ const Index = () => {
                   VPG IA
                 </Button>
               </Link>
-              <Link to="/login">
-                <Button variant="outline" className="rounded-full border-green-200 hover:bg-green-50">
-                  Entrar
-                </Button>
-              </Link>
-              <Link to="/register">
-                <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full shadow-lg">
-                  Cadastrar Empresa
-                </Button>
-              </Link>
+              {user ? (
+                <Link to="/dashboard">
+                  <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full shadow-lg">
+                    Dashboard
+                  </Button>
+                </Link>
+              ) : (
+                <>
+                  <Link to="/auth">
+                    <Button variant="outline" className="rounded-full border-green-200 hover:bg-green-50">
+                      Entrar
+                    </Button>
+                  </Link>
+                  <Link to="/auth">
+                    <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full shadow-lg">
+                      Cadastrar Empresa
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -125,7 +137,6 @@ const Index = () => {
             </p>
           </div>
 
-          {/* Search Section - More prominent */}
           <div className="max-w-5xl mx-auto animate-slide-up mb-8">
             <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md rounded-3xl">
               <CardContent className="p-6 md:p-8">
@@ -157,7 +168,6 @@ const Index = () => {
             </Card>
           </div>
 
-          {/* Quick stats - smaller and less prominent */}
           <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto text-center">
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4">
               <div className="text-2xl font-bold">150+</div>
@@ -200,7 +210,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Featured Jobs - Now the main focus */}
       <section className="py-12 md:py-20 bg-gradient-to-br from-white to-green-50 relative">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -287,7 +296,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* CTA Section for Companies */}
       <section className="py-16 bg-gradient-to-br from-gray-900 via-green-900 to-gray-900 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 to-yellow-600/20"></div>
         <div className="container mx-auto px-4 text-center relative z-10">
@@ -298,7 +306,7 @@ const Index = () => {
             Publique suas vagas e encontre os melhores profissionais de Ponta Grossa e Curitiba.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link to="/register">
+            <Link to="/auth">
               <Button size="lg" className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-gray-900 px-8 py-4 text-xl font-bold rounded-full shadow-2xl">
                 Cadastrar Empresa Gratuitamente
               </Button>
@@ -313,7 +321,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-gradient-to-r from-gray-800 to-gray-900 py-12 text-white">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-center space-x-3 mb-8">

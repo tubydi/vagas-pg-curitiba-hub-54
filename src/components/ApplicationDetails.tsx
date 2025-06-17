@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,17 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { User, Mail, Phone, MapPin, Calendar, FileText, Download, ExternalLink } from 'lucide-react';
+import { User, Mail, Phone, Calendar, FileText, Download, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Database } from '@/integrations/supabase/types';
-
-type Application = Database['public']['Tables']['applications']['Row'] & {
-  jobs: Database['public']['Tables']['jobs']['Row'];
-};
 
 interface ApplicationDetailsProps {
-  application: Application;
+  application: any;
   onStatusUpdate: (applicationId: string, newStatus: string) => void;
   onClose: () => void;
 }
@@ -25,7 +21,7 @@ const ApplicationDetails: React.FC<ApplicationDetailsProps> = ({
   onStatusUpdate,
   onClose
 }) => {
-  const [status, setStatus] = useState<Database['public']['Enums']['application_status']>(application.status);
+  const [status, setStatus] = useState(application.status || 'Novo');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -78,15 +74,19 @@ const ApplicationDetails: React.FC<ApplicationDetailsProps> = ({
     }
   };
 
+  if (!application) {
+    return null;
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-2xl">{application.name}</CardTitle>
+              <CardTitle className="text-2xl">{application.name || 'Candidato'}</CardTitle>
               <CardDescription>
-                Candidatura para: {application.jobs.title}
+                Candidatura para: {application.jobs?.title || 'Vaga'}
               </CardDescription>
             </div>
             <div className="flex items-center space-x-2">
@@ -102,81 +102,43 @@ const ApplicationDetails: React.FC<ApplicationDetailsProps> = ({
         
         <CardContent className="space-y-6">
           {/* Informações pessoais */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center">
-                  <User className="w-5 h-5 mr-2" />
-                  Informações Pessoais
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center">
+                <User className="w-5 h-5 mr-2" />
+                Informações Pessoais
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center">
+                <Mail className="w-4 h-4 mr-2 text-gray-500" />
+                <span>{application.email}</span>
+              </div>
+              <div className="flex items-center">
+                <Phone className="w-4 h-4 mr-2 text-gray-500" />
+                <span>{application.phone}</span>
+              </div>
+              {application.linkedin && (
                 <div className="flex items-center">
-                  <Mail className="w-4 h-4 mr-2 text-gray-500" />
-                  <span>{application.email}</span>
+                  <ExternalLink className="w-4 h-4 mr-2 text-gray-500" />
+                  <a 
+                    href={application.linkedin} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    LinkedIn
+                  </a>
                 </div>
-                <div className="flex items-center">
-                  <Phone className="w-4 h-4 mr-2 text-gray-500" />
-                  <span>{application.phone}</span>
-                </div>
-                {application.linkedin && (
-                  <div className="flex items-center">
-                    <ExternalLink className="w-4 h-4 mr-2 text-gray-500" />
-                    <a 
-                      href={application.linkedin} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      LinkedIn
-                    </a>
-                  </div>
-                )}
-                <div className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-2 text-gray-500" />
-                  <span>
-                    Candidatura enviada em: {new Date(application.created_at).toLocaleDateString('pt-BR')}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Informações profissionais */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Informações Profissionais</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {application.experience_years && (
-                  <div>
-                    <strong>Anos de experiência:</strong> {application.experience_years}
-                  </div>
-                )}
-                {application.current_position && (
-                  <div>
-                    <strong>Cargo atual:</strong> {application.current_position}
-                  </div>
-                )}
-                {application.education && (
-                  <div>
-                    <strong>Formação:</strong> {application.education}
-                  </div>
-                )}
-                {application.skills && application.skills.length > 0 && (
-                  <div>
-                    <strong>Habilidades:</strong>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {application.skills.map((skill, index) => (
-                        <Badge key={index} variant="outline">
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+              )}
+              <div className="flex items-center">
+                <Calendar className="w-4 h-4 mr-2 text-gray-500" />
+                <span>
+                  Candidatura enviada em: {new Date(application.created_at).toLocaleDateString('pt-BR')}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Carta de apresentação */}
           {application.cover_letter && (
@@ -225,7 +187,7 @@ const ApplicationDetails: React.FC<ApplicationDetailsProps> = ({
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="status">Novo Status</Label>
-                <Select value={status} onValueChange={(value: Database['public']['Enums']['application_status']) => setStatus(value)}>
+                <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>

@@ -7,14 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Database } from '@/integrations/supabase/types';
-
-type Job = Database['public']['Tables']['jobs']['Row'] & {
-  companies: Database['public']['Tables']['companies']['Row'];
-};
 
 interface JobApplicationFormProps {
-  job: Job;
+  job: any;
   onClose: () => void;
 }
 
@@ -52,7 +47,7 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `resumes/${fileName}`;
+      const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('resumes')
@@ -108,7 +103,7 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
         skills: skillsArray.length > 0 ? skillsArray : null,
         cover_letter: formData.cover_letter || null,
         resume_url: resumeUrl,
-        status: 'Novo' as const
+        status: 'Novo'
       };
 
       console.log('Dados da candidatura:', applicationData);
@@ -144,12 +139,16 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
     }
   };
 
+  if (!job) {
+    return null;
+  }
+
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle>Candidatar-se para {job.title}</CardTitle>
         <CardDescription>
-          {job.companies.name} - {job.location}
+          {job.companies?.name || job.company} - {job.location}
         </CardDescription>
       </CardHeader>
       <CardContent>

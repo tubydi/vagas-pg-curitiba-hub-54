@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, MapPin, Search, Users, TrendingUp, Star, Clock, DollarSign, Brain, Sparkles } from "lucide-react";
+import { Building2, MapPin, Search, Star, Clock, DollarSign, Brain, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import JobApplicationForm from "@/components/JobApplicationForm";
@@ -31,20 +31,7 @@ const Index = () => {
       description: "Desenvolvimento de aplicações web modernas com React e Node.js",
       postedAt: "2 dias atrás",
       companies: {
-        id: "1",
         name: "Tech PG",
-        email: "contato@techpg.com",
-        phone: "(42) 99999-9999",
-        cnpj: "12.345.678/0001-90",
-        address: "Rua das Flores, 123",
-        city: "Ponta Grossa",
-        sector: "Tecnologia",
-        legal_representative: "João Silva",
-        description: "Empresa de tecnologia",
-        status: "Ativa" as const,
-        user_id: "1",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
       }
     },
     {
@@ -59,20 +46,7 @@ const Index = () => {
       description: "Gestão de campanhas digitais e análise de métricas",
       postedAt: "1 dia atrás",
       companies: {
-        id: "2",
         name: "Marketing Solutions",
-        email: "contato@marketing.com",
-        phone: "(41) 88888-8888",
-        cnpj: "98.765.432/0001-10",
-        address: "Av. Central, 456",
-        city: "Curitiba",
-        sector: "Marketing",
-        legal_representative: "Maria Santos",
-        description: "Agência de marketing",
-        status: "Ativa" as const,
-        user_id: "2",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
       }
     },
     {
@@ -87,20 +61,7 @@ const Index = () => {
       description: "Criação de interfaces intuitivas e experiências digitais",
       postedAt: "3 dias atrás",
       companies: {
-        id: "3",
         name: "Creative Agency",
-        email: "contato@creative.com",
-        phone: "(42) 77777-7777",
-        cnpj: "11.222.333/0001-44",
-        address: "Rua Criativa, 789",
-        city: "Ponta Grossa",
-        sector: "Design",
-        legal_representative: "Carlos Design",
-        description: "Agência criativa",
-        status: "Ativa" as const,
-        user_id: "3",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
       }
     },
     {
@@ -115,20 +76,7 @@ const Index = () => {
       description: "Prospecção de clientes e gestão de pipeline de vendas",
       postedAt: "1 semana atrás",
       companies: {
-        id: "4",
         name: "Vendas Plus",
-        email: "contato@vendas.com",
-        phone: "(41) 66666-6666",
-        cnpj: "55.666.777/0001-88",
-        address: "Rua Comercial, 321",
-        city: "Curitiba",
-        sector: "Vendas",
-        legal_representative: "Ana Vendas",
-        description: "Empresa de vendas",
-        status: "Ativa" as const,
-        user_id: "4",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
       }
     }
   ];
@@ -164,6 +112,11 @@ const Index = () => {
                   VPG IA
                 </Button>
               </Link>
+              <Link to="/jobs">
+                <Button variant="outline" className="rounded-full border-green-200 hover:bg-green-50">
+                  Ver Todas as Vagas
+                </Button>
+              </Link>
               {user ? (
                 <Link to="/dashboard">
                   <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full shadow-lg">
@@ -189,7 +142,7 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Hero Section with Search - Moved up and made more prominent */}
+      {/* Hero Section */}
       <section className="bg-gradient-to-br from-green-500 via-green-600 to-yellow-500 text-white py-12 md:py-20 relative overflow-hidden">
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="container mx-auto px-4 text-center relative z-10">
@@ -228,9 +181,11 @@ const Index = () => {
                       <SelectItem value="curitiba">Curitiba</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button className="h-14 px-8 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl text-lg font-semibold shadow-lg">
-                    Buscar Vagas
-                  </Button>
+                  <Link to="/jobs">
+                    <Button className="h-14 px-8 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl text-lg font-semibold shadow-lg">
+                      Buscar Vagas
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
@@ -253,7 +208,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* VPG IA Banner - New section */}
+      {/* VPG IA Banner */}
       <section className="py-8 bg-gradient-to-r from-gray-900 via-green-900 to-gray-900 text-white">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between max-w-4xl mx-auto">
@@ -278,6 +233,7 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Vagas em Destaque */}
       <section className="py-12 md:py-20 bg-gradient-to-br from-white to-green-50 relative">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -291,7 +247,7 @@ const Index = () => {
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
             {featuredJobs.map((job, index) => (
-              <Card key={job.id} className="group hover:shadow-2xl transition-all duration-500 border-0 bg-white rounded-3xl overflow-hidden animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
+              <Card key={job.id} className="group hover:shadow-2xl transition-all duration-500 border-0 bg-white rounded-3xl overflow-hidden">
                 <CardHeader className="bg-gradient-to-br from-gray-50 to-green-50 pb-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
@@ -353,17 +309,20 @@ const Index = () => {
           </div>
 
           <div className="text-center mt-12">
-            <Button 
-              size="lg" 
-              variant="outline"
-              className="rounded-full px-8 py-3 text-lg font-semibold border-green-200 hover:bg-green-50 hover:border-green-300"
-            >
-              Ver Todas as Vagas
-            </Button>
+            <Link to="/jobs">
+              <Button 
+                size="lg" 
+                variant="outline"
+                className="rounded-full px-8 py-3 text-lg font-semibold border-green-200 hover:bg-green-50 hover:border-green-300"
+              >
+                Ver Todas as Vagas
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
 
+      {/* CTA Empresas */}
       <section className="py-16 bg-gradient-to-br from-gray-900 via-green-900 to-gray-900 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 to-yellow-600/20"></div>
         <div className="container mx-auto px-4 text-center relative z-10">
@@ -389,6 +348,7 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Footer */}
       <footer className="bg-gradient-to-r from-gray-800 to-gray-900 py-12 text-white">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-center space-x-3 mb-8">

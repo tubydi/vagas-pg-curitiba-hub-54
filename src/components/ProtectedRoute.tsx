@@ -22,13 +22,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       if (!user) {
         console.log('No user, redirecting to auth');
         navigate("/auth");
-      } else if (requireAdmin && !isAdmin) {
-        console.log('Admin required but user is not admin, redirecting to dashboard');
-        navigate("/dashboard");
-      } else if (!requireAdmin && isAdmin && window.location.pathname === '/dashboard') {
-        console.log('Admin user accessing regular dashboard, redirecting to admin');
-        navigate("/admin");
       }
+      // Removi todas as verificações de requireAdmin - admin usa o mesmo dashboard
     }
   }, [user, loading, isAdmin, requireAdmin, navigate]);
 
@@ -43,8 +38,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Se não tem usuário ou se precisa de admin mas não é admin, não renderiza nada
-  if (!user || (requireAdmin && !isAdmin)) {
+  // Se não tem usuário, não renderiza nada (será redirecionado)
+  if (!user) {
     return null;
   }
 

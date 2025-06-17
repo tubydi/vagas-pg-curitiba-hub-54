@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -45,22 +44,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('Setting admin status:', isAdminUser, 'for user:', session.user.email);
           setIsAdmin(isAdminUser);
           
-          // Redirecionar baseado no tipo de usuário
-          if (isAdminUser) {
-            console.log('Admin user detected, redirecting to /admin');
-            setTimeout(() => {
-              if (window.location.pathname === '/auth' || window.location.pathname === '/dashboard') {
-                window.location.href = '/admin';
-              }
-            }, 100);
-          } else {
-            console.log('Regular user, redirecting to /dashboard');
-            setTimeout(() => {
-              if (window.location.pathname === '/auth' || window.location.pathname === '/admin') {
-                window.location.href = '/dashboard';
-              }
-            }, 100);
-          }
+          // Redirecionar APENAS para /dashboard (admin e empresa usam o mesmo dashboard)
+          console.log('User authenticated, redirecting to /dashboard');
+          setTimeout(() => {
+            if (window.location.pathname === '/auth') {
+              window.location.href = '/dashboard';
+            }
+          }, 100);
         } else {
           setIsAdmin(false);
         }
@@ -79,13 +69,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const isAdminUser = session.user.email === 'admin@vagaspg.com';
         console.log('Initial admin check:', isAdminUser, 'for user:', session.user.email);
         setIsAdmin(isAdminUser);
-        
-        // Redirecionamento inicial
-        if (isAdminUser && window.location.pathname === '/dashboard') {
-          window.location.href = '/admin';
-        } else if (!isAdminUser && window.location.pathname === '/admin') {
-          window.location.href = '/dashboard';
-        }
       }
       
       setLoading(false);

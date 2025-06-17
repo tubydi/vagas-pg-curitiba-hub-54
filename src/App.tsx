@@ -9,7 +9,6 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import Admin from "./pages/Admin";
 import VpgIAPage from "./pages/VpgIA";
 import Jobs from "./pages/Jobs";
 import NotFound from "./pages/NotFound";
@@ -32,14 +31,6 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Dashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin" 
-              element={
-                <ProtectedRoute requireAdmin>
-                  <Admin />
                 </ProtectedRoute>
               } 
             />

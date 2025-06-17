@@ -45,10 +45,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const isUserAdmin = session.user.email === 'admin@vagaspg.com';
           setIsAdmin(isUserAdmin);
           
-          // Ensure profile exists
+          // Ensure profile exists with timeout to avoid blocking
           setTimeout(async () => {
             await ensureProfileExists(session.user);
-          }, 0);
+          }, 100);
         } else {
           setIsAdmin(false);
         }
@@ -67,10 +67,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const isUserAdmin = session.user.email === 'admin@vagaspg.com';
         setIsAdmin(isUserAdmin);
         
-        // Ensure profile exists
+        // Ensure profile exists with timeout to avoid blocking
         setTimeout(async () => {
           await ensureProfileExists(session.user);
-        }, 0);
+        }, 100);
       }
       
       setLoading(false);
@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('profiles')
         .select('id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (!existingProfile) {
         console.log('Creating profile for user:', user.email);
@@ -103,7 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             role: role
           });
 
-        if (error) {
+        if (error && !error.message.includes('duplicate key')) {
           console.error('Error creating profile:', error);
         } else {
           console.log('Profile created successfully');
@@ -127,20 +127,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Sign in error:', error);
+        let errorMessage = 'Erro no login. Tente novamente.';
+        
+        if (error.message === 'Invalid login credentials') {
+          errorMessage = "Email ou senha incorretos. Verifique se você está usando o email corporativo cadastrado.";
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = "Email não confirmado. Verifique sua caixa de entrada.";
+        }
+        
         toast({
           title: "Erro no login",
-          description: error.message === 'Invalid login credentials' 
-            ? "Email ou senha incorretos" 
-            : error.message,
+          description: errorMessage,
           variant: "destructive",
+          duration: 5000,
         });
         return { error };
       }
 
       console.log('Sign in successful');
       toast({
-        title: "Login realizado com sucesso!",
-        description: "Bem-vindo de volta!",
+        title: "✅ Login realizado com sucesso!",
+        description: `Bem-vindo de volta, ${email}!`,
+        duration: 3000,
       });
 
       return { error: null };
@@ -150,6 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: "Erro inesperado",
         description: "Ocorreu um erro durante o login. Tente novamente.",
         variant: "destructive",
+        duration: 5000,
       });
       return { error };
     }
@@ -178,24 +187,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           errorMessage = 'Este email já está cadastrado. Tente fazer login.';
         } else if (error.message.includes('weak password')) {
           errorMessage = 'A senha deve ter pelo menos 6 caracteres.';
+        } else if (error.message.includes('rate limit')) {
+          errorMessage = 'Muitas tentativas. Aguarde um momento e tente novamente.';
         }
         
         toast({
           title: "Erro no cadastro",
           description: errorMessage,
           variant: "destructive",
+          duration: 6000,
         });
         return { error };
       }
 
       if (data.user) {
-        console.log('User created, ensuring profile exists');
-        await ensureProfileExists(data.user);
+        console.log('User created successfully:', data.user.email);
         
-        toast({
-          title: "Cadastro realizado com sucesso!",
-          description: "Você já pode fazer login e cadastrar sua empresa.",
-        });
+        // Não mostrar toast aqui, será mostrado no componente Auth após criar a empresa
+        return { error: null };
       }
 
       return { error: null };
@@ -205,6 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: "Erro inesperado",
         description: "Ocorreu um erro durante o cadastro. Tente novamente.",
         variant: "destructive",
+        duration: 5000,
       });
       return { error };
     }
@@ -217,6 +227,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast({
         title: "Logout realizado",
         description: "Você foi desconectado com sucesso.",
+        duration: 3000,
       });
     } catch (error) {
       console.error('Sign out error:', error);
@@ -224,6 +235,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: "Erro no logout",
         description: "Ocorreu um erro ao desconectar.",
         variant: "destructive",
+        duration: 5000,
       });
     }
   };
@@ -264,6 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           title: "Erro ao cadastrar empresa",
           description: errorMessage,
           variant: "destructive",
+          duration: 6000,
         });
         return { error };
       }
@@ -272,6 +285,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast({
         title: "Empresa cadastrada com sucesso!",
         description: "Sua empresa foi cadastrada e está aguardando aprovação.",
+        duration: 5000,
       });
 
       return { error: null };
@@ -281,6 +295,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: "Erro inesperado",
         description: "Ocorreu um erro ao cadastrar a empresa. Tente novamente.",
         variant: "destructive",
+        duration: 5000,
       });
       return { error };
     }

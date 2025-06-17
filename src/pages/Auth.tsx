@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Building2, ArrowLeft, Shield } from "lucide-react";
+import { Building2, ArrowLeft } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -18,7 +19,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [validatingCnpj, setValidatingCnpj] = useState(false);
-  const { signIn, signUp, user, createAdminUser } = useAuth();
+  const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -74,22 +75,16 @@ const Auth = () => {
       const { error } = await signIn(email, password);
       
       if (!error) {
-        navigate("/dashboard");
+        // O redirecionamento será feito automaticamente pelo AuthContext
+        toast({
+          title: "Login realizado",
+          description: "Bem-vindo!",
+        });
       }
     } catch (error) {
       console.error('Login error:', error);
     }
     
-    setLoading(false);
-  };
-
-  const handleCreateAdminUser = async () => {
-    setLoading(true);
-    try {
-      await createAdminUser();
-    } catch (error) {
-      console.error('Error creating admin:', error);
-    }
     setLoading(false);
   };
 
@@ -148,7 +143,7 @@ const Auth = () => {
         return;
       }
 
-      // Limpar formulário e fazer login automaticamente
+      // Limpar formulário
       setCompanyData({
         companyName: "",
         cnpj: "",
@@ -162,14 +157,6 @@ const Auth = () => {
         confirmPassword: "",
         description: ""
       });
-
-      // Aguardar um pouco e tentar fazer login automaticamente
-      setTimeout(async () => {
-        const { error: loginError } = await signIn(companyData.email, companyData.password);
-        if (!loginError) {
-          navigate("/dashboard");
-        }
-      }, 1000);
 
     } catch (error) {
       console.error('Signup error:', error);
@@ -232,19 +219,16 @@ const Auth = () => {
               <TabsContent value="login">
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Corporativo</Label>
+                    <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
                       type="email"
-                      placeholder="contato@suaempresa.com"
+                      placeholder="seu@email.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       className="rounded-xl"
                     />
-                    <p className="text-xs text-gray-500">
-                      Use o mesmo email que você cadastrou sua empresa
-                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Senha</Label>
@@ -266,31 +250,6 @@ const Auth = () => {
                     {loading ? "Entrando..." : "Entrar"}
                   </Button>
                 </form>
-
-                {/* Seção de Admin */}
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <div className="text-center space-y-3">
-                    <div className="flex items-center justify-center space-x-2 text-sm text-gray-600">
-                      <Shield className="w-4 h-4" />
-                      <span>Acesso Administrativo</span>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Se você é administrador e não consegue fazer login, clique abaixo para criar/recriar o usuário admin:
-                    </p>
-                    <Button
-                      onClick={handleCreateAdminUser}
-                      variant="outline"
-                      size="sm"
-                      disabled={loading}
-                      className="w-full"
-                    >
-                      {loading ? "Criando..." : "Criar Usuário Admin"}
-                    </Button>
-                    <p className="text-xs text-green-600 font-medium">
-                      Email: admin@vagaspg.com | Senha: admin123
-                    </p>
-                  </div>
-                </div>
               </TabsContent>
 
               <TabsContent value="register">

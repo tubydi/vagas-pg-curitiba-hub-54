@@ -77,6 +77,14 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
       const filePath = fileName;
 
+      // Criar bucket se não existir
+      const { error: bucketError } = await supabase.storage
+        .createBucket('resumes', { public: false });
+      
+      if (bucketError && !bucketError.message.includes('already exists')) {
+        console.error('Erro ao criar bucket:', bucketError);
+      }
+
       const { data, error: uploadError } = await supabase.storage
         .from('resumes')
         .upload(filePath, file, {
@@ -153,7 +161,7 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
       // Preparar dados para inserção
       const skillsArray = formData.skills.trim() 
         ? formData.skills.split(',').map(s => s.trim()).filter(s => s.length > 0)
-        : null;
+        : [];
       
       const experienceYears = formData.experience_years 
         ? parseInt(formData.experience_years) 
@@ -168,13 +176,13 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
         experience_years: experienceYears,
         current_position: formData.current_position.trim() || null,
         education: formData.education.trim() || null,
-        skills: skillsArray,
+        skills: skillsArray.length > 0 ? skillsArray : null,
         cover_letter: formData.cover_letter.trim() || null,
         resume_url: resumeUrl,
         status: 'Novo' as ApplicationStatus
       };
 
-      console.log('Dados da candidatura:', applicationData);
+      console.log('Dados da candidatura preparados:', applicationData);
 
       // Inserir candidatura no banco
       const { data, error } = await supabase
@@ -184,15 +192,24 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
         .single();
 
       if (error) {
-        console.error('Erro ao inserir candidatura:', error);
-        throw error;
+        console.error('Erro detalhado ao inserir candidatura:', error);
+        
+        // Tratar erros específicos
+        if (error.message.includes('duplicate')) {
+          throw new Error('Você já se candidatou para esta vaga');
+        } else if (error.message.includes('foreign key')) {
+          throw new Error('Vaga não encontrada ou inválida');
+        } else {
+          throw new Error(`Erro no banco de dados: ${error.message}`);
+        }
       }
 
       console.log('Candidatura inserida com sucesso:', data);
 
       toast({
-        title: "Candidatura enviada!",
+        title: "✅ Candidatura enviada!",
         description: "Sua candidatura foi enviada com sucesso. A empresa entrará em contato em breve.",
+        duration: 5000,
       });
 
       // Fechar o formulário
@@ -207,8 +224,12 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
           errorMessage = "Erro no upload do currículo. Tente novamente ou envie um arquivo diferente.";
         } else if (error.message.includes('duplicate')) {
           errorMessage = "Você já se candidatou para esta vaga.";
-        } else {
+        } else if (error.message.includes('foreign key')) {
+          errorMessage = "Vaga não encontrada. Atualize a página e tente novamente.";
+        } else if (error.message.includes('banco de dados')) {
           errorMessage = error.message;
+        } else {
+          errorMessage = `Erro: ${error.message}`;
         }
       }
       
@@ -216,6 +237,7 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
         title: "Erro ao enviar candidatura",
         description: errorMessage,
         variant: "destructive",
+        duration: 8000,
       });
     } finally {
       setLoading(false);
@@ -235,15 +257,15 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>Candidatar-se para {job.title}</CardTitle>
-        <CardDescription>
+    <Card className="w-full max-w-2xl mx-auto border-0 shadow-2xl">
+      <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-3xl">
+        <CardTitle className="text-2xl">Candidatar-se para {job.title}</CardTitle>
+        <CardDescription className="text-green-100 text-lg">
           {job.companies?.name || job.company || 'Empresa'} - {job.location}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <CardContent className="p-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nome Completo *</Label>
@@ -254,6 +276,7 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
                 onChange={handleInputChange}
                 required
                 placeholder="Seu nome completo"
+                className="rounded-xl"
               />
             </div>
             <div className="space-y-2">
@@ -266,6 +289,7 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
                 onChange={handleInputChange}
                 required
                 placeholder="seu@email.com"
+                className="rounded-xl"
               />
             </div>
           </div>
@@ -279,7 +303,8 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
                 value={formData.phone}
                 onChange={handleInputChange}
                 required
-                placeholder="(11) 99999-9999"
+                placeholder="(42) 99999-9999"
+                className="rounded-xl"
               />
             </div>
             <div className="space-y-2">
@@ -290,6 +315,7 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
                 value={formData.linkedin}
                 onChange={handleInputChange}
                 placeholder="https://linkedin.com/in/seuperfil"
+                className="rounded-xl"
               />
             </div>
           </div>
@@ -306,6 +332,7 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
                 value={formData.experience_years}
                 onChange={handleInputChange}
                 placeholder="Ex: 3"
+                className="rounded-xl"
               />
             </div>
             <div className="space-y-2">
@@ -316,6 +343,7 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
                 value={formData.current_position}
                 onChange={handleInputChange}
                 placeholder="Ex: Desenvolvedor Frontend"
+                className="rounded-xl"
               />
             </div>
           </div>
@@ -328,6 +356,7 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
               value={formData.education}
               onChange={handleInputChange}
               placeholder="Ex: Graduação em Engenharia de Software"
+              className="rounded-xl"
             />
           </div>
 
@@ -339,6 +368,7 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
               value={formData.skills}
               onChange={handleInputChange}
               placeholder="Ex: JavaScript, React, Node.js (separar por vírgula)"
+              className="rounded-xl"
             />
           </div>
 
@@ -349,10 +379,11 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
               type="file"
               accept=".pdf,.doc,.docx"
               onChange={handleResumeChange}
+              className="rounded-xl"
             />
             {resume && (
-              <p className="text-sm text-green-600">
-                Arquivo selecionado: {resume.name}
+              <p className="text-sm text-green-600 font-medium">
+                ✓ Arquivo selecionado: {resume.name}
               </p>
             )}
           </div>
@@ -366,22 +397,24 @@ const JobApplicationForm: React.FC<JobApplicationFormProps> = ({ job, onClose })
               onChange={handleInputChange}
               placeholder="Escreva uma breve apresentação sobre você e por que se interessa por esta vaga..."
               rows={4}
+              className="rounded-xl"
             />
           </div>
 
-          <div className="flex gap-2 pt-4">
+          <div className="flex gap-3 pt-6">
             <Button 
               type="submit" 
               disabled={loading} 
-              className="flex-1"
+              className="flex-1 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-semibold text-lg"
             >
-              {loading ? 'Enviando...' : 'Enviar Candidatura'}
+              {loading ? 'Enviando...' : '✨ Enviar Candidatura'}
             </Button>
             <Button 
               type="button" 
               variant="outline" 
               onClick={onClose}
               disabled={loading}
+              className="h-12 px-8 rounded-xl border-gray-300"
             >
               Cancelar
             </Button>

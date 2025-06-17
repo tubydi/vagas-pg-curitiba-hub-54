@@ -8,7 +8,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, companyData?: any) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
   loading: boolean;
@@ -83,6 +83,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Sign in error:', error);
+        
+        // Verificar se é erro de email não confirmado
+        if (error.message.includes('Email not confirmed')) {
+          toast({
+            title: "Email não confirmado",
+            description: "Verifique sua caixa de entrada e clique no link de confirmação. Se não recebeu o email, tente fazer o cadastro novamente.",
+            variant: "destructive",
+          });
+          return { error };
+        }
+        
         toast({
           title: "Erro no login",
           description: error.message === 'Invalid login credentials' 
@@ -111,54 +122,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Attempting sign up for:', email);
       
+      // Usar uma URL mais simples para teste
       const redirectUrl = `${window.location.origin}/auth`;
       
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: redirectUrl
+          emailRedirectTo: redirectUrl,
+          data: {
+            company_name: companyData?.companyName || '',
+            cnpj: companyData?.cnpj || ''
+          }
         }
       });
 
       if (error) {
         console.error('Sign up error:', error);
-        toast({
-          title: "Erro no cadastro",
-          description: error.message,
-          variant: "destructive",
-        });
+        
+        if (error.message.includes('User already registered')) {
+          toast({
+            title: "Usuário já cadastrado",
+            description: "Este email já está cadastrado. Tente fazer login ou use outro email.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Erro no cadastro",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
         return { error };
       }
 
-      // Se há dados da empresa e o usuário foi criado
-      if (data.user && companyData) {
-        console.log('Creating company data for user:', data.user.id);
+      // Se o usuário foi criado mas ainda não confirmou o email
+      if (data.user && !data.user.email_confirmed_at) {
+        toast({
+          title: "📧 Confirme seu email!",
+          description: `Enviamos um email de confirmação para ${email}. Verifique sua caixa de entrada (e spam) e clique no link para ativar sua conta.`,
+          duration: 10000,
+        });
         
-        try {
-          const { error: companyError } = await supabase
-            .from('companies')
-            .insert([{
-              user_id: data.user.id,
-              name: companyData.companyName,
-              cnpj: companyData.cnpj,
-              email: companyData.email,
-              phone: companyData.phone,
-              address: companyData.address,
-              city: companyData.city,
-              sector: companyData.sector,
-              legal_representative: companyData.legalRepresentative,
-              description: companyData.description || '',
-              status: 'Pendente'
-            }]);
+        // Criar dados da empresa após o cadastro
+        if (companyData) {
+          console.log('Creating company data for user:', data.user.id);
+          
+          try {
+            const { error: companyError } = await supabase
+              .from('companies')
+              .insert([{
+                user_id: data.user.id,
+                name: companyData.companyName,
+                cnpj: companyData.cnpj,
+                email: companyData.email,
+                phone: companyData.phone,
+                address: companyData.address,
+                city: companyData.city,
+                sector: companyData.sector,
+                legal_representative: companyData.legalRepresentative,
+                description: companyData.description || '',
+                status: 'Pendente'
+              }]);
 
-          if (companyError) {
-            console.error('Company creation error:', companyError);
-          } else {
-            console.log('Company data created successfully');
+            if (companyError) {
+              console.error('Company creation error:', companyError);
+            } else {
+              console.log('Company data created successfully');
+            }
+          } catch (companyCreationError) {
+            console.error('Error creating company:', companyCreationError);
           }
-        } catch (companyCreationError) {
-          console.error('Error creating company:', companyCreationError);
         }
       }
 

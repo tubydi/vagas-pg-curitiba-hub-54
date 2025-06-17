@@ -6,18 +6,20 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Building2, ArrowLeft } from "lucide-react";
+import { Building2, ArrowLeft, AlertCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [validatingCnpj, setValidatingCnpj] = useState(false);
+  const [showResendButton, setShowResendButton] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -42,6 +44,42 @@ const Auth = () => {
       navigate("/dashboard");
     }
   }, [user, navigate]);
+
+  const resendConfirmationEmail = async () => {
+    if (!email) {
+      toast({
+        title: "Email necessário",
+        description: "Digite seu email para reenviar a confirmação.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth`
+        }
+      });
+
+      if (error) {
+        toast({
+          title: "Erro ao reenviar",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Email reenviado!",
+          description: "Verifique sua caixa de entrada.",
+        });
+      }
+    } catch (error) {
+      console.error('Resend error:', error);
+    }
+  };
 
   const validateCnpj = async (cnpj: string) => {
     try {
@@ -69,11 +107,14 @@ const Auth = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setShowResendButton(false);
     
     try {
       const { error } = await signIn(email, password);
       
-      if (!error) {
+      if (error && error.message.includes('Email not confirmed')) {
+        setShowResendButton(true);
+      } else if (!error) {
         navigate("/dashboard");
       }
     } catch (error) {
@@ -212,6 +253,22 @@ const Auth = () => {
           </CardHeader>
 
           <CardContent>
+            {showResendButton && (
+              <Alert className="mb-4 border-yellow-200 bg-yellow-50">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <AlertDescription className="text-yellow-800">
+                  Seu email ainda não foi confirmado. 
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto ml-1 text-yellow-600 underline"
+                    onClick={resendConfirmationEmail}
+                  >
+                    Clique aqui para reenviar o email de confirmação
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+
             <Tabs defaultValue="login" className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="login">Entrar</TabsTrigger>

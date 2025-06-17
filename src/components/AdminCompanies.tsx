@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Search, Edit, Trash2, CheckCircle, XCircle, Eye } from "lucide-react";
+import type { Database } from "@/integrations/supabase/types";
+
+type CompanyStatus = Database['public']['Enums']['company_status'];
 
 interface Company {
   id: string;
@@ -20,9 +23,10 @@ interface Company {
   sector: string;
   legal_representative: string;
   description: string;
-  status: string;
+  status: CompanyStatus;
   created_at: string;
   updated_at: string;
+  user_id: string;
 }
 
 const AdminCompanies = () => {
@@ -35,6 +39,7 @@ const AdminCompanies = () => {
   const fetchCompanies = async () => {
     try {
       setLoading(true);
+      console.log('ADMIN: Buscando TODAS as empresas do banco...');
       const { data, error } = await supabase
         .from('companies')
         .select('*')
@@ -42,9 +47,15 @@ const AdminCompanies = () => {
 
       if (error) {
         console.error('Erro ao buscar empresas:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar empresas.",
+          variant: "destructive",
+        });
         return;
       }
 
+      console.log('Total de empresas no banco:', data?.length || 0);
       setCompanies(data || []);
     } catch (error) {
       console.error('Erro:', error);
@@ -53,8 +64,9 @@ const AdminCompanies = () => {
     }
   };
 
-  const updateCompanyStatus = async (companyId: string, newStatus: string) => {
+  const updateCompanyStatus = async (companyId: string, newStatus: CompanyStatus) => {
     try {
+      console.log('ADMIN: Alterando status da empresa:', companyId, 'para:', newStatus);
       const { error } = await supabase
         .from('companies')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -82,9 +94,10 @@ const AdminCompanies = () => {
   };
 
   const deleteCompany = async (companyId: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta empresa? Isso também excluirá todas as vagas da empresa.')) return;
+    if (!confirm('⚠️ ATENÇÃO: Tem certeza que deseja excluir esta empresa? Isso também excluirá todas as vagas e candidaturas da empresa. Esta ação não pode ser desfeita!')) return;
 
     try {
+      console.log('ADMIN: Excluindo empresa:', companyId);
       const { error } = await supabase
         .from('companies')
         .delete()
@@ -130,7 +143,7 @@ const AdminCompanies = () => {
     return (
       <div className="text-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Carregando empresas...</p>
+        <p className="mt-4 text-gray-600">Carregando TODAS as empresas...</p>
       </div>
     );
   }
@@ -138,7 +151,7 @@ const AdminCompanies = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-2xl md:text-3xl font-bold">Gerenciar Empresas</h2>
+        <h2 className="text-2xl md:text-3xl font-bold">🔥 ADMIN - GERENCIAR EMPRESAS</h2>
         <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -165,7 +178,7 @@ const AdminCompanies = () => {
       </div>
 
       <div className="text-sm text-gray-600">
-        {filteredCompanies.length} empresa{filteredCompanies.length !== 1 ? 's' : ''} encontrada{filteredCompanies.length !== 1 ? 's' : ''}
+        📊 {filteredCompanies.length} empresa{filteredCompanies.length !== 1 ? 's' : ''} encontrada{filteredCompanies.length !== 1 ? 's' : ''} no banco de dados
       </div>
 
       <div className="grid gap-6">
@@ -181,13 +194,16 @@ const AdminCompanies = () => {
           </Card>
         ) : (
           filteredCompanies.map((company) => (
-            <Card key={company.id} className="border-0 rounded-3xl shadow-lg hover:shadow-xl transition-shadow">
+            <Card key={company.id} className="border-0 rounded-3xl shadow-lg hover:shadow-xl transition-shadow border-l-4 border-l-red-500">
               <CardHeader className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-t-3xl">
                 <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                   <div className="flex-1">
                     <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
                       <Building2 className="h-6 w-6 mr-2 text-blue-500" />
                       {company.name}
+                      <Badge variant="outline" className="ml-2 bg-red-50 text-red-600 border-red-200">
+                        🔥 ADMIN
+                      </Badge>
                     </CardTitle>
                     <div className="mt-2 space-y-1">
                       <p className="text-sm text-gray-600">📧 {company.email}</p>
@@ -195,6 +211,7 @@ const AdminCompanies = () => {
                       <p className="text-sm text-gray-600">🏢 CNPJ: {company.cnpj}</p>
                       <p className="text-sm text-gray-600">📍 {company.city}</p>
                       <p className="text-sm text-gray-600">🏭 {company.sector}</p>
+                      <p className="text-sm text-gray-600">👤 User ID: {company.user_id}</p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">

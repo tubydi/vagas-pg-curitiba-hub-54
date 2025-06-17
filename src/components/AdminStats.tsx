@@ -16,6 +16,7 @@ const AdminStats = ({ onViewApplications, onViewCompanies }: AdminStatsProps) =>
     totalCompanies: 0,
     activeCompanies: 0,
     pendingCompanies: 0,
+    blockedCompanies: 0,
     totalJobs: 0,
     activeJobs: 0,
     totalApplications: 0,
@@ -24,6 +25,8 @@ const AdminStats = ({ onViewApplications, onViewCompanies }: AdminStatsProps) =>
 
   const fetchAdminStats = async () => {
     try {
+      console.log('ADMIN: Buscando estatísticas completas do sistema...');
+      
       // Buscar estatísticas de empresas
       const { data: companies } = await supabase
         .from('companies')
@@ -32,6 +35,7 @@ const AdminStats = ({ onViewApplications, onViewCompanies }: AdminStatsProps) =>
       const totalCompanies = companies?.length || 0;
       const activeCompanies = companies?.filter(c => c.status === 'Ativa').length || 0;
       const pendingCompanies = companies?.filter(c => c.status === 'Pendente').length || 0;
+      const blockedCompanies = companies?.filter(c => c.status === 'Bloqueada').length || 0;
 
       // Buscar estatísticas de vagas
       const { data: jobs } = await supabase
@@ -49,10 +53,22 @@ const AdminStats = ({ onViewApplications, onViewCompanies }: AdminStatsProps) =>
       const totalApplications = applications?.length || 0;
       const newApplications = applications?.filter(a => a.status === 'Novo').length || 0;
 
+      console.log('ADMIN STATS:', {
+        totalCompanies,
+        activeCompanies,
+        pendingCompanies,
+        blockedCompanies,
+        totalJobs,
+        activeJobs,
+        totalApplications,
+        newApplications
+      });
+
       setStats({
         totalCompanies,
         activeCompanies,
         pendingCompanies,
+        blockedCompanies,
         totalJobs,
         activeJobs,
         totalApplications,
@@ -65,12 +81,22 @@ const AdminStats = ({ onViewApplications, onViewCompanies }: AdminStatsProps) =>
 
   useEffect(() => {
     fetchAdminStats();
+    
+    // Atualizar estatísticas a cada 30 segundos
+    const interval = setInterval(fetchAdminStats, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   return (
     <div className="space-y-6">
+      <div className="bg-gradient-to-r from-red-500 to-red-600 p-4 rounded-xl text-white text-center">
+        <h1 className="text-2xl font-bold">🔥 PAINEL DE CONTROLE ADMINISTRATIVO 🔥</h1>
+        <p className="text-red-100">Você tem acesso total a TODOS os dados do sistema</p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-0 rounded-3xl shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
+        <Card className="border-0 rounded-3xl shadow-lg bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-l-blue-500">
           <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-3xl">
             <CardTitle className="text-lg font-bold flex items-center">
               <Building2 className="h-5 w-5 mr-2" />
@@ -84,6 +110,9 @@ const AdminStats = ({ onViewApplications, onViewCompanies }: AdminStatsProps) =>
                 <span className="text-green-600">Ativas: {stats.activeCompanies}</span>
                 <span className="text-yellow-600">Pendentes: {stats.pendingCompanies}</span>
               </div>
+              {stats.blockedCompanies > 0 && (
+                <div className="text-sm text-red-600">Bloqueadas: {stats.blockedCompanies}</div>
+              )}
               <Button 
                 onClick={onViewCompanies}
                 className="w-full mt-4 bg-blue-500 hover:bg-blue-600"
@@ -96,7 +125,7 @@ const AdminStats = ({ onViewApplications, onViewCompanies }: AdminStatsProps) =>
           </CardContent>
         </Card>
 
-        <Card className="border-0 rounded-3xl shadow-lg bg-gradient-to-br from-green-50 to-green-100">
+        <Card className="border-0 rounded-3xl shadow-lg bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-l-green-500">
           <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-3xl">
             <CardTitle className="text-lg font-bold flex items-center">
               <Briefcase className="h-5 w-5 mr-2" />
@@ -107,11 +136,12 @@ const AdminStats = ({ onViewApplications, onViewCompanies }: AdminStatsProps) =>
             <div className="space-y-2">
               <div className="text-3xl font-bold text-green-600">{stats.totalJobs}</div>
               <div className="text-sm text-gray-600">Ativas: {stats.activeJobs}</div>
+              <div className="text-xs text-gray-500">Total no banco</div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-0 rounded-3xl shadow-lg bg-gradient-to-br from-purple-50 to-purple-100">
+        <Card className="border-0 rounded-3xl shadow-lg bg-gradient-to-br from-purple-50 to-purple-100 border-l-4 border-l-purple-500">
           <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-t-3xl">
             <CardTitle className="text-lg font-bold flex items-center">
               <Users className="h-5 w-5 mr-2" />
@@ -134,7 +164,7 @@ const AdminStats = ({ onViewApplications, onViewCompanies }: AdminStatsProps) =>
           </CardContent>
         </Card>
 
-        <Card className="border-0 rounded-3xl shadow-lg bg-gradient-to-br from-orange-50 to-orange-100">
+        <Card className="border-0 rounded-3xl shadow-lg bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-l-orange-500">
           <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-3xl">
             <CardTitle className="text-lg font-bold">
               Status do Sistema
@@ -148,6 +178,9 @@ const AdminStats = ({ onViewApplications, onViewCompanies }: AdminStatsProps) =>
               </div>
               <div className="text-lg font-bold text-orange-600">ADMIN</div>
               <div className="text-xs text-gray-500">Controle Total</div>
+              <Badge className="bg-red-500 text-white mt-2">
+                🔥 SUPER USER
+              </Badge>
             </div>
           </CardContent>
         </Card>

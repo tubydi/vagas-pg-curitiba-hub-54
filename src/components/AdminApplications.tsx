@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Users, Search, Download, Mail, Phone, Eye, Building2, Briefcase } from "lucide-react";
+import type { Database } from "@/integrations/supabase/types";
+
+type ApplicationStatus = Database['public']['Enums']['application_status'];
 
 interface Application {
   id: string;
@@ -22,7 +24,7 @@ interface Application {
   cover_letter: string;
   linkedin: string;
   resume_url: string;
-  status: string;
+  status: ApplicationStatus;
   created_at: string;
   job_id: string;
   jobs: {
@@ -43,6 +45,7 @@ const AdminApplications = () => {
   const fetchApplications = async () => {
     try {
       setLoading(true);
+      console.log('Buscando TODAS as candidaturas para admin...');
       const { data, error } = await supabase
         .from('applications')
         .select(`
@@ -58,10 +61,15 @@ const AdminApplications = () => {
 
       if (error) {
         console.error('Erro ao buscar candidaturas:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar candidaturas.",
+          variant: "destructive",
+        });
         return;
       }
 
-      console.log('Candidaturas encontradas:', data?.length || 0);
+      console.log('Total de candidaturas encontradas:', data?.length || 0);
       setApplications(data || []);
     } catch (error) {
       console.error('Erro:', error);
@@ -70,8 +78,9 @@ const AdminApplications = () => {
     }
   };
 
-  const updateApplicationStatus = async (applicationId: string, newStatus: string) => {
+  const updateApplicationStatus = async (applicationId: string, newStatus: ApplicationStatus) => {
     try {
+      console.log('Atualizando status da candidatura:', applicationId, 'para:', newStatus);
       const { error } = await supabase
         .from('applications')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -151,7 +160,7 @@ const AdminApplications = () => {
     return (
       <div className="text-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Carregando candidaturas...</p>
+        <p className="mt-4 text-gray-600">Carregando TODAS as candidaturas...</p>
       </div>
     );
   }
@@ -159,7 +168,7 @@ const AdminApplications = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-2xl md:text-3xl font-bold">Todas as Candidaturas</h2>
+        <h2 className="text-2xl md:text-3xl font-bold">🔥 ADMIN - TODAS AS CANDIDATURAS</h2>
         <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -188,7 +197,7 @@ const AdminApplications = () => {
       </div>
 
       <div className="text-sm text-gray-600">
-        {filteredApplications.length} candidatura{filteredApplications.length !== 1 ? 's' : ''} encontrada{filteredApplications.length !== 1 ? 's' : ''}
+        📊 {filteredApplications.length} candidatura{filteredApplications.length !== 1 ? 's' : ''} encontrada{filteredApplications.length !== 1 ? 's' : ''} no banco de dados
       </div>
 
       <div className="space-y-6">
@@ -204,7 +213,7 @@ const AdminApplications = () => {
           </Card>
         ) : (
           filteredApplications.map((application) => (
-            <Card key={application.id} className="border-0 rounded-3xl shadow-lg hover:shadow-xl transition-shadow">
+            <Card key={application.id} className="border-0 rounded-3xl shadow-lg hover:shadow-xl transition-shadow border-l-4 border-l-red-500">
               <CardContent className="p-8">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-6 flex-1">
@@ -219,6 +228,9 @@ const AdminApplications = () => {
                         <h3 className="text-xl font-bold text-gray-900">{application.name}</h3>
                         <Badge className={`${getStatusColor(application.status)} rounded-full px-3 py-1 font-semibold`}>
                           {application.status}
+                        </Badge>
+                        <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">
+                          🔥 ADMIN VIEW
                         </Badge>
                       </div>
                       
@@ -279,7 +291,7 @@ const AdminApplications = () => {
                   <div className="flex flex-col space-y-3 ml-6">
                     <Select
                       value={application.status}
-                      onValueChange={(value) => updateApplicationStatus(application.id, value)}
+                      onValueChange={(value) => updateApplicationStatus(application.id, value as ApplicationStatus)}
                     >
                       <SelectTrigger className="w-40">
                         <SelectValue />

@@ -15,7 +15,8 @@ import {
   Edit,
   Trash2,
   User,
-  LogOut
+  LogOut,
+  Shield
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -69,12 +70,22 @@ const Dashboard = () => {
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
 
+  console.log('🔍 Dashboard - isAdmin:', isAdmin, 'user:', user?.email);
+
   useEffect(() => {
     if (user) {
-      fetchCompanyData();
-      fetchJobs();
+      console.log('👤 Usuário logado no dashboard:', user.email, 'isAdmin:', isAdmin);
+      
+      // Se for admin, não buscar dados de empresa
+      if (!isAdmin) {
+        fetchCompanyData();
+        fetchJobs();
+      } else {
+        console.log('🔑 Usuário é ADMIN - não buscando dados de empresa');
+        setLoading(false);
+      }
     }
-  }, [user]);
+  }, [user, isAdmin]);
 
   const fetchCompanyData = async () => {
     try {
@@ -191,6 +202,84 @@ const Dashboard = () => {
     }
   };
 
+  // Se for admin, mostrar painel administrativo
+  if (isAdmin) {
+    console.log('🔑 Renderizando painel ADMIN');
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50">
+        {/* Header Admin */}
+        <header className="bg-gradient-to-r from-red-500 to-red-600 shadow-2xl border-b border-red-200 sticky top-0 z-40">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="bg-white p-2 rounded-xl">
+                  <Shield className="h-8 w-8 text-red-600" />
+                </div>
+                <div>
+                  <h1 className="text-xl md:text-2xl font-bold text-white">
+                    🔥 PAINEL ADMINISTRATIVO 🔥
+                  </h1>
+                  <p className="text-red-100">
+                    Controle Total do Sistema - {user?.email}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Badge className="bg-white text-red-600 font-bold">
+                  🔑 SUPER ADMIN
+                </Badge>
+                <Button
+                  variant="outline"
+                  onClick={handleSignOut}
+                  className="rounded-full bg-white text-red-600 hover:bg-red-50"
+                  size="sm"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  <span className="hidden md:inline">Sair</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="container mx-auto px-4 py-8">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+            <TabsList className="grid w-full grid-cols-3 bg-white/50 backdrop-blur-md rounded-2xl p-2">
+              <TabsTrigger value="overview" className="rounded-xl text-xs md:text-sm">
+                <BarChart3 className="w-4 h-4 mr-1 md:mr-2" />
+                Estatísticas
+              </TabsTrigger>
+              <TabsTrigger value="companies" className="rounded-xl text-xs md:text-sm">
+                <Building2 className="w-4 h-4 mr-1 md:mr-2" />
+                Empresas
+              </TabsTrigger>
+              <TabsTrigger value="applications" className="rounded-xl text-xs md:text-sm">
+                <Users className="w-4 h-4 mr-1 md:mr-2" />
+                Candidaturas
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-6">
+              <AdminStats 
+                onViewApplications={() => setActiveTab("applications")}
+                onViewCompanies={() => setActiveTab("companies")}
+              />
+            </TabsContent>
+
+            <TabsContent value="companies" className="space-y-6">
+              <AdminCompanies />
+            </TabsContent>
+
+            <TabsContent value="applications" className="space-y-6">
+              <AdminApplications />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não for admin, mostrar painel de empresa
   if (loading && !company) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50 flex items-center justify-center">
@@ -202,9 +291,11 @@ const Dashboard = () => {
     );
   }
 
+  console.log('🏢 Renderizando painel de EMPRESA');
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50">
-      {/* Header */}
+      {/* Header Empresa */}
       <header className="bg-white/90 backdrop-blur-md shadow-lg border-b border-green-100 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -217,7 +308,7 @@ const Dashboard = () => {
                   Dashboard - {company?.name || 'Empresa'}
                 </h1>
                 <p className="text-sm text-gray-600">
-                  {isAdmin ? 'Administrador' : 'Painel da Empresa'}
+                  Painel da Empresa
                 </p>
               </div>
             </div>

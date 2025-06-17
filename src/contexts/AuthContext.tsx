@@ -30,28 +30,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
 
+  const checkAdminStatus = async (userEmail: string | undefined) => {
+    if (!userEmail) {
+      setIsAdmin(false);
+      return;
+    }
+
+    console.log('🔍 Verificando status de admin para:', userEmail);
+    
+    // Verificar se é o email de admin
+    const isAdminEmail = userEmail === 'admin@vagaspg.com';
+    console.log('📧 É email de admin?', isAdminEmail);
+    
+    if (isAdminEmail) {
+      // Verificar se existe um perfil admin no banco
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('email', userEmail)
+          .single();
+
+        console.log('👤 Perfil encontrado:', profile);
+        console.log('❌ Erro ao buscar perfil:', error);
+
+        if (profile && profile.role === 'admin') {
+          console.log('✅ CONFIRMADO: Usuário é ADMIN pelo perfil');
+          setIsAdmin(true);
+        } else {
+          console.log('⚠️ Perfil admin não encontrado, mas email é de admin - definindo como admin');
+          setIsAdmin(true);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao verificar perfil admin:', error);
+        // Se houve erro mas o email é de admin, considerar como admin mesmo assim
+        setIsAdmin(true);
+      }
+    } else {
+      console.log('❌ Não é email de admin');
+      setIsAdmin(false);
+    }
+  };
+
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
+        console.log('🔄 Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Check admin status
-          const isAdminUser = session.user.email === 'admin@vagaspg.com';
-          console.log('Setting admin status:', isAdminUser, 'for user:', session.user.email);
-          setIsAdmin(isAdminUser);
+          console.log('👤 Usuário logado:', session.user.email);
+          await checkAdminStatus(session.user.email);
           
-          // Redirecionar APENAS para /dashboard (admin e empresa usam o mesmo dashboard)
-          console.log('User authenticated, redirecting to /dashboard');
+          // Redirecionar para dashboard após login
+          console.log('🔀 Redirecionando para /dashboard');
           setTimeout(() => {
             if (window.location.pathname === '/auth') {
               window.location.href = '/dashboard';
             }
           }, 100);
         } else {
+          console.log('👤 Usuário deslogado');
           setIsAdmin(false);
         }
         
@@ -60,15 +101,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session?.user?.email);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log('🔍 Verificação inicial de sessão:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        const isAdminUser = session.user.email === 'admin@vagaspg.com';
-        console.log('Initial admin check:', isAdminUser, 'for user:', session.user.email);
-        setIsAdmin(isAdminUser);
+        await checkAdminStatus(session.user.email);
       }
       
       setLoading(false);
@@ -79,7 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('Attempting sign in for:', email);
+      console.log('🔐 Tentando login para:', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -87,7 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
-        console.error('Sign in error:', error);
+        console.error('❌ Erro no login:', error);
         
         toast({
           title: "Erro no login",
@@ -100,7 +139,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        console.log('Login successful for:', email);
+        console.log('✅ Login bem-sucedido para:', email);
+        
+        // Verificar status de admin imediatamente após o login
+        await checkAdminStatus(email);
         
         // Verificar se é admin e mostrar mensagem especial
         if (email === 'admin@vagaspg.com') {
@@ -118,14 +160,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { error: null };
     } catch (error) {
-      console.error('Sign in catch error:', error);
+      console.error('❌ Erro catch no login:', error);
       return { error };
     }
   };
 
   const signUp = async (email: string, password: string, companyData?: any) => {
     try {
-      console.log('Attempting sign up for:', email);
+      console.log('📝 Tentando cadastro para:', email);
       
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -139,7 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
-        console.error('Sign up error:', error);
+        console.error('❌ Erro no cadastro:', error);
         
         if (error.message.includes('User already registered')) {
           toast({
@@ -158,10 +200,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        console.log('User created successfully:', data.user.id);
+        console.log('✅ Usuário criado:', data.user.id);
         
         if (companyData) {
-          console.log('Creating company data for user:', data.user.id);
+          console.log('🏢 Criando dados da empresa...');
           
           try {
             const { error: companyError } = await supabase
@@ -181,12 +223,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               });
 
             if (companyError) {
-              console.error('Company creation error:', companyError);
+              console.error('❌ Erro ao criar empresa:', companyError);
             } else {
-              console.log('Company data created successfully');
+              console.log('✅ Dados da empresa criados');
             }
           } catch (companyCreationError) {
-            console.error('Error creating company:', companyCreationError);
+            console.error('❌ Erro na criação da empresa:', companyCreationError);
           }
         }
 
@@ -197,12 +239,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
 
         setTimeout(async () => {
-          console.log('Attempting auto-login after signup...');
+          console.log('🔄 Tentando auto-login...');
           const { error: loginError } = await signIn(email, password);
           if (!loginError) {
-            console.log('Auto-login successful after signup');
+            console.log('✅ Auto-login realizado');
           } else {
-            console.log('Auto-login failed, user needs to login manually');
+            console.log('❌ Auto-login falhou');
             toast({
               title: "Faça login",
               description: "Use suas credenciais para acessar sua conta.",
@@ -213,18 +255,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { error: null };
     } catch (error) {
-      console.error('Sign up catch error:', error);
+      console.error('❌ Erro catch no cadastro:', error);
       return { error };
     }
   };
 
   const signOut = async () => {
     try {
-      console.log('Signing out...');
+      console.log('🚪 Fazendo logout...');
       const { error } = await supabase.auth.signOut({ scope: 'global' });
       
       if (error) {
-        console.error('Sign out error:', error);
+        console.error('❌ Erro no logout:', error);
         throw error;
       }
 
@@ -232,9 +274,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(null);
       setIsAdmin(false);
       
-      console.log('Sign out successful');
+      console.log('✅ Logout realizado');
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('❌ Erro no logout:', error);
       throw error;
     }
   };

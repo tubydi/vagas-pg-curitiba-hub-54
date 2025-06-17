@@ -10,6 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Database } from "@/integrations/supabase/types";
+
+type ContractType = Database["public"]["Enums"]["contract_type"];
+type WorkMode = Database["public"]["Enums"]["work_mode"];
+type ExperienceLevel = Database["public"]["Enums"]["experience_level"];
 
 interface JobFormProps {
   job?: any;
@@ -27,9 +32,9 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
     requirements: "",
     salary: "",
     location: "",
-    contract_type: "",
-    work_mode: "",
-    experience_level: ""
+    contract_type: "" as ContractType,
+    work_mode: "" as WorkMode,
+    experience_level: "" as ExperienceLevel
   });
 
   const [benefitsList, setBenefitsList] = useState<string[]>([]);
@@ -43,9 +48,9 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
         requirements: job.requirements || "",
         salary: job.salary || "",
         location: job.location || "",
-        contract_type: job.contract_type || "",
-        work_mode: job.work_mode || "",
-        experience_level: job.experience_level || ""
+        contract_type: job.contract_type || "" as ContractType,
+        work_mode: job.work_mode || "" as WorkMode,
+        experience_level: job.experience_level || "" as ExperienceLevel
       });
       setBenefitsList(job.benefits || []);
     }
@@ -60,7 +65,7 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
         ...formData,
         benefits: benefitsList,
         company_id: companyId,
-        status: 'Ativa'
+        status: 'Ativa' as const
       };
 
       if (job?.id) {

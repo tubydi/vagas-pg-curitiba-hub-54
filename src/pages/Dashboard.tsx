@@ -316,7 +316,9 @@ const Dashboard = () => {
       };
     }
     
-    if (job.status === 'Pendente') {
+    // Removido a comparação job.status === 'Pendente' que causava erro de tipo
+    // Agora verificamos apenas se o pagamento foi aprovado mas o status ainda não é Ativa
+    if (job.payment_status === 'approved' && job.status !== 'Ativa') {
       return {
         variant: 'secondary' as const,
         text: 'Aguardando Aprovação',
@@ -480,8 +482,8 @@ const Dashboard = () => {
     );
   }
 
-  // Contar vagas por status
-  const pendingJobs = jobs.filter(job => job.payment_status === 'pending' || job.status === 'Pendente');
+  // Contar vagas por status - corrigido para não comparar com 'Pendente'
+  const pendingJobs = jobs.filter(job => job.payment_status === 'pending' || (job.payment_status === 'approved' && job.status !== 'Ativa'));
   const activeJobs = jobs.filter(job => job.status === 'Ativa');
 
   console.log('Renderizando painel de EMPRESA');
@@ -506,7 +508,7 @@ const Dashboard = () => {
             </div>
             <div className="flex items-center space-x-3">
               <Badge variant={company?.status === 'Ativa' ? 'default' : 'secondary'}>
-                {company?.status || 'Pendente'}
+                {company?.status || 'Ativa'}
               </Badge>
               <Button
                 variant="outline"

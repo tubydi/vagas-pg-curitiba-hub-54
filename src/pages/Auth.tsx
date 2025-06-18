@@ -135,7 +135,13 @@ const Auth = () => {
       console.log('Creating user account with email:', companyData.email);
 
       // Criar usuário no Supabase Auth com o EMAIL CORPORATIVO
-      const { error: authError } = await signUp(companyData.email, companyData.password, companyData);
+      // Agora passando dados com status 'Ativa' para ativação automática
+      const companyDataWithActiveStatus = {
+        ...companyData,
+        status: 'Ativa' // Definir empresa como ativa automaticamente
+      };
+
+      const { error: authError } = await signUp(companyData.email, companyData.password, companyDataWithActiveStatus);
       
       if (authError) {
         console.error('Auth error:', authError);
@@ -431,7 +437,7 @@ const Auth = () => {
                     className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl h-12 text-lg"
                     disabled={loading || validatingCnpj}
                   >
-                    {loading ? "Cadastrando..." : validatingCnpj ? "Validando CNPJ..." : "Cadastrar Empresa (Ativação Automática)"}
+                    {loading ? "Cadastrando..." : validatingCnpj ? "Validando CNPJ..." : "Cadastrar Empresa (Ativa Automaticamente)"}
                   </Button>
                 </form>
               </TabsContent>

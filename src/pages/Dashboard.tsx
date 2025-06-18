@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +18,9 @@ import {
   User,
   LogOut,
   Shield,
-  Sparkles
+  Sparkles,
+  AlertCircle,
+  Mail
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -64,6 +67,7 @@ interface DashboardJob {
   created_at: string;
   benefits: string[] | null;
   company_id: string;
+  payment_status?: string;
 }
 
 // Job interface for the application form
@@ -295,6 +299,46 @@ const Dashboard = () => {
     }
   };
 
+  const getJobStatusInfo = (job: DashboardJob) => {
+    if (job.payment_status === 'pending') {
+      return {
+        variant: 'destructive' as const,
+        text: 'Pagamento Pendente',
+        message: 'Aguardando pagamento para ativação'
+      };
+    }
+    
+    if (job.payment_status === 'rejected' || job.payment_status === 'cancelled') {
+      return {
+        variant: 'destructive' as const,
+        text: 'Pagamento Rejeitado',
+        message: 'Pagamento não foi aprovado'
+      };
+    }
+    
+    if (job.status === 'Pendente') {
+      return {
+        variant: 'secondary' as const,
+        text: 'Aguardando Aprovação',
+        message: 'Vaga está sendo analisada pelo administrador'
+      };
+    }
+    
+    if (job.status === 'Ativa') {
+      return {
+        variant: 'default' as const,
+        text: 'Ativa',
+        message: 'Vaga está recebendo candidaturas'
+      };
+    }
+    
+    return {
+      variant: 'secondary' as const,
+      text: job.status,
+      message: ''
+    };
+  };
+
   console.log('VERIFICAÇÃO FINAL - isAdmin:', isAdmin, 'user email:', user?.email);
   
   if (isAdmin) {
@@ -436,6 +480,10 @@ const Dashboard = () => {
     );
   }
 
+  // Contar vagas por status
+  const pendingJobs = jobs.filter(job => job.payment_status === 'pending' || job.status === 'Pendente');
+  const activeJobs = jobs.filter(job => job.status === 'Ativa');
+
   console.log('Renderizando painel de EMPRESA');
   
   return (
@@ -521,25 +569,49 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="text-3xl font-bold text-green-600">
-                    {jobs.filter(job => job.status === 'Ativa').length}
+                    {activeJobs.length}
                   </div>
                   <p className="text-sm text-gray-600">Recebendo candidaturas</p>
                 </CardContent>
               </Card>
 
               <Card className="border-0 rounded-3xl shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-t-3xl">
+                <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-3xl">
                   <CardTitle className="text-lg font-bold flex items-center">
-                    <Building2 className="h-5 w-5 mr-2" />
-                    Status
+                    <AlertCircle className="h-5 w-5 mr-2" />
+                    Vagas Pendentes
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold text-purple-600">{company?.status}</div>
-                  <p className="text-sm text-gray-600">Status da empresa</p>
+                  <div className="text-3xl font-bold text-orange-600">{pendingJobs.length}</div>
+                  <p className="text-sm text-gray-600">Aguardando aprovação/pagamento</p>
                 </CardContent>
               </Card>
             </div>
+
+            {/* Aviso sobre vagas pendentes */}
+            {pendingJobs.length > 0 && (
+              <Card className="border-orange-200 bg-orange-50 rounded-3xl shadow-lg">
+                <CardContent className="p-6">
+                  <div className="flex items-start space-x-4">
+                    <AlertCircle className="h-6 w-6 text-orange-600 mt-1" />
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-orange-800 mb-2">
+                        Vagas Aguardando Liberação
+                      </h3>
+                      <p className="text-orange-700 mb-4">
+                        Você possui {pendingJobs.length} vaga(s) que estão aguardando pagamento ou aprovação do administrador.
+                        Se você já efetuou o pagamento e a vaga ainda não foi liberada, entre em contato conosco.
+                      </p>
+                      <div className="flex items-center space-x-2 text-orange-600">
+                        <Mail className="h-4 w-4" />
+                        <span className="font-medium">pontagrossavagas@gmail.com</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="jobs" className="space-y-6">
@@ -587,57 +659,88 @@ const Dashboard = () => {
                   </CardContent>
                 </Card>
               ) : (
-                jobs.map((job) => (
-                  <Card key={job.id} className="border-0 rounded-3xl shadow-lg hover:shadow-xl transition-shadow">
-                    <CardHeader className="bg-gradient-to-r from-gray-50 to-green-50 rounded-t-3xl">
-                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg md:text-xl font-bold text-gray-900">
-                            {job.title}
-                          </CardTitle>
-                          <CardDescription className="text-green-600 font-medium text-sm md:text-base">
-                            {job.location} • {job.contract_type} • {job.work_mode}
-                          </CardDescription>
+                jobs.map((job) => {
+                  const statusInfo = getJobStatusInfo(job);
+                  return (
+                    <Card key={job.id} className="border-0 rounded-3xl shadow-lg hover:shadow-xl transition-shadow">
+                      <CardHeader className="bg-gradient-to-r from-gray-50 to-green-50 rounded-t-3xl">
+                        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg md:text-xl font-bold text-gray-900">
+                              {job.title}
+                            </CardTitle>
+                            <CardDescription className="text-green-600 font-medium text-sm md:text-base">
+                              {job.location} • {job.contract_type} • {job.work_mode}
+                            </CardDescription>
+                          </div>
+                          <div className="flex flex-col space-y-2">
+                            <Badge variant={statusInfo.variant}>
+                              {statusInfo.text}
+                            </Badge>
+                            {statusInfo.message && (
+                              <p className="text-xs text-gray-500">{statusInfo.message}</p>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex space-x-2">
-                          <Badge variant={job.status === 'Ativa' ? 'default' : 'secondary'}>
-                            {job.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    
-                    <CardContent className="p-4 md:p-6">
-                      <p className="text-gray-600 mb-4 line-clamp-2 text-sm md:text-base">{job.description}</p>
+                      </CardHeader>
                       
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div className="text-lg font-bold text-green-600">
-                          {job.salary}
+                      <CardContent className="p-4 md:p-6">
+                        <p className="text-gray-600 mb-4 line-clamp-2 text-sm md:text-base">{job.description}</p>
+                        
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                          <div className="text-lg font-bold text-green-600">
+                            {job.salary}
+                          </div>
+                          <div className="flex space-x-2 w-full sm:w-auto">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditJob(job)}
+                              className="rounded-xl flex-1 sm:flex-none"
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Editar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteJob(job.id)}
+                              className="rounded-xl text-red-600 hover:text-red-700 flex-1 sm:flex-none"
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Excluir
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex space-x-2 w-full sm:w-auto">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditJob(job)}
-                            className="rounded-xl flex-1 sm:flex-none"
-                          >
-                            <Edit className="w-4 h-4 mr-1" />
-                            Editar
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteJob(job.id)}
-                            className="rounded-xl text-red-600 hover:text-red-700 flex-1 sm:flex-none"
-                          >
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            Excluir
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+
+                        {/* Mensagem específica para vagas com pagamento pendente */}
+                        {job.payment_status === 'pending' && (
+                          <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-xl">
+                            <div className="flex items-center space-x-2 text-orange-700">
+                              <AlertCircle className="h-4 w-4" />
+                              <p className="text-sm">
+                                <strong>Pagamento pendente:</strong> Complete o pagamento para ativar esta vaga.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Mensagem para vagas aguardando aprovação do admin */}
+                        {job.status === 'Pendente' && job.payment_status === 'approved' && (
+                          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                            <div className="flex items-center space-x-2 text-blue-700">
+                              <AlertCircle className="h-4 w-4" />
+                              <p className="text-sm">
+                                <strong>Aguardando aprovação:</strong> Esta vaga está sendo analisada pelo administrador. 
+                                Se demorar mais que o esperado, entre em contato: pontagrossavagas@gmail.com
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })
               )}
             </div>
           </TabsContent>

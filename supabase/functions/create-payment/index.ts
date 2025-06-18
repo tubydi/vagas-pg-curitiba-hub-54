@@ -25,6 +25,13 @@ serve(async (req) => {
 
     const { jobData, companyId } = await req.json()
     console.log('Creating payment for job:', jobData)
+    console.log('Company ID received:', companyId)
+
+    // Validar se companyId foi fornecido
+    if (!companyId || companyId.trim() === '') {
+      console.error('Company ID is missing or empty')
+      throw new Error('Company ID is required')
+    }
 
     // Verificar se a empresa é isenta
     const { data: company } = await supabaseClient
@@ -32,6 +39,8 @@ serve(async (req) => {
       .select('email')
       .eq('id', companyId)
       .single()
+
+    console.log('Company data found:', company)
 
     if (company?.email === 'vagas@vagas.com') {
       // Empresa isenta - criar job diretamente
@@ -85,6 +94,8 @@ serve(async (req) => {
       external_reference: companyId
     }
 
+    console.log('Creating Mercado Pago preference:', preference)
+
     const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
       headers: {
@@ -115,7 +126,12 @@ serve(async (req) => {
       .select()
       .single()
 
-    if (jobError) throw jobError
+    if (jobError) {
+      console.error('Error creating job:', jobError)
+      throw jobError
+    }
+
+    console.log('Job created:', job)
 
     const { data: payment, error: paymentError } = await supabaseClient
       .from('payments')
@@ -130,7 +146,12 @@ serve(async (req) => {
       .select()
       .single()
 
-    if (paymentError) throw paymentError
+    if (paymentError) {
+      console.error('Error creating payment:', paymentError)
+      throw paymentError
+    }
+
+    console.log('Payment created:', payment)
 
     // Atualizar job com payment_id
     await supabaseClient

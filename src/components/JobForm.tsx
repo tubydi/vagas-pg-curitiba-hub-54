@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,8 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
   const [companyEmail, setCompanyEmail] = useState("");
 
   useEffect(() => {
+    console.log('JobForm mounted with companyId:', companyId);
+    
     if (job) {
       setFormData({
         title: job.title || "",
@@ -67,13 +70,24 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
 
     // Buscar email da empresa
     const fetchCompanyEmail = async () => {
-      const { data } = await supabase
+      if (!companyId) {
+        console.error('CompanyId is missing');
+        return;
+      }
+      
+      const { data, error } = await supabase
         .from('companies')
         .select('email')
         .eq('id', companyId)
         .single();
       
+      if (error) {
+        console.error('Error fetching company email:', error);
+        return;
+      }
+      
       if (data) {
+        console.log('Company email found:', data.email);
         setCompanyEmail(data.email);
       }
     };
@@ -82,6 +96,12 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
   }, [job, companyId]);
 
   const createPayment = async () => {
+    console.log('Creating payment with companyId:', companyId);
+    
+    if (!companyId || companyId.trim() === '') {
+      throw new Error('Company ID is missing');
+    }
+
     const { data, error } = await supabase.functions.invoke('create-payment', {
       body: {
         jobData: {
@@ -92,7 +112,11 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
       }
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error in create-payment function:', error);
+      throw error;
+    }
+    
     return data;
   };
 
@@ -143,7 +167,17 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
         setLoading(false);
       }
     } else {
-      // Nova vaga - mostrar modal de pagamento
+      // Nova vaga - verificar se companyId existe antes de mostrar modal
+      if (!companyId || companyId.trim() === '') {
+        toast({
+          title: "Erro",
+          description: "ID da empresa não encontrado. Tente fazer login novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log('Opening payment modal for new job with companyId:', companyId);
       setShowPaymentModal(true);
     }
   };

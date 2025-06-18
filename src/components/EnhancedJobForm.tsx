@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +52,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
 
   useEffect(() => {
     if (job) {
+      console.log('Loading job data for editing:', job);
       setFormData({
         title: job.title || "",
         description: job.description || "",
@@ -84,6 +84,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         console.error('Error fetching company email:', error);
       } else if (data) {
         setCompanyEmail(data.email);
+        console.log('Company email loaded:', data.email);
       }
     } catch (error) {
       console.error('Error fetching company email:', error);
@@ -114,28 +115,49 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
     setShowAIExtractor(false);
   };
 
+  const validateForm = () => {
+    const errors = [];
+    
+    if (!formData.title.trim()) errors.push("Título da vaga é obrigatório");
+    if (!formData.description.trim()) errors.push("Descrição da vaga é obrigatória");
+    if (!formData.requirements.trim()) errors.push("Requisitos são obrigatórios");
+    if (!formData.salary.trim()) errors.push("Faixa salarial é obrigatória");
+    if (!formData.location.trim()) errors.push("Local é obrigatório");
+    if (!formData.contract_type) errors.push("Tipo de contrato é obrigatório");
+    if (!formData.work_mode) errors.push("Modalidade é obrigatória");
+    if (!formData.experience_level) errors.push("Nível de experiência é obrigatório");
+    
+    if (formData.has_external_application && !formData.contact_info.trim()) {
+      errors.push("Informação de contato é obrigatória quando candidatura externa está habilitada");
+    }
+
+    return errors;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    console.log('Starting job creation/update process');
+    console.log('=== STARTING JOB SUBMISSION ===');
     console.log('Company ID:', companyId);
+    console.log('Company Email:', companyEmail);
     console.log('Form Data:', formData);
 
-    // Validate required fields
-    if (!formData.title || !formData.description || !formData.requirements || 
-        !formData.salary || !formData.location || !formData.contract_type || 
-        !formData.work_mode || !formData.experience_level) {
+    // Validate form
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      console.error('Validation errors:', validationErrors);
       toast({
-        title: "Erro",
-        description: "Todos os campos obrigatórios devem ser preenchidos.",
+        title: "❌ Erro de Validação",
+        description: validationErrors.join(", "),
         variant: "destructive",
       });
       return;
     }
 
     if (!companyId) {
+      console.error('No company ID provided');
       toast({
-        title: "Erro",
+        title: "❌ Erro",
         description: "ID da empresa não encontrado.",
         variant: "destructive",
       });
@@ -149,24 +171,28 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         ...formData,
         benefits: benefitsList,
         company_id: companyId,
-        status: 'Ativa' as const // Always active - valid enum status
+        status: 'Ativa' as const // Always use 'Ativa' status
       };
 
-      console.log('Job data to be inserted:', jobData);
+      console.log('=== JOB DATA TO BE SAVED ===');
+      console.log(jobData);
 
       if (job?.id) {
         // Update existing job
-        console.log('Updating existing job:', job.id);
-        const { error } = await supabase
+        console.log('=== UPDATING EXISTING JOB ===', job.id);
+        const { data: updatedJob, error } = await supabase
           .from('jobs')
           .update(jobData)
-          .eq('id', job.id);
+          .eq('id', job.id)
+          .select()
+          .single();
 
         if (error) {
           console.error('Error updating job:', error);
-          throw error;
+          throw new Error(`Erro ao atualizar vaga: ${error.message}`);
         }
 
+        console.log('Job updated successfully:', updatedJob);
         toast({
           title: "✅ Vaga atualizada!",
           description: "A vaga foi atualizada com sucesso!",
@@ -175,7 +201,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         onSave();
       } else {
         // Create new job
-        console.log('Creating new job...');
+        console.log('=== CREATING NEW JOB ===');
         const { data: insertedData, error } = await supabase
           .from('jobs')
           .insert([jobData])
@@ -184,21 +210,28 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
 
         if (error) {
           console.error('Error creating job:', error);
-          throw error;
+          throw new Error(`Erro ao criar vaga: ${error.message}`);
+        }
+
+        if (!insertedData) {
+          throw new Error('Vaga criada mas dados não retornados');
         }
 
         console.log('Job created successfully:', insertedData);
         setCreatedJobId(insertedData.id);
 
         // Check if company is exempt from payment
-        if (companyEmail === 'vagas@vagas.com' || companyEmail === 'admin@vagaspg.com') {
+        const isExemptCompany = companyEmail === 'vagas@vagas.com' || companyEmail === 'admin@vagaspg.com';
+        
+        if (isExemptCompany) {
+          console.log('Company is exempt from payment');
           toast({
             title: "✅ Vaga Publicada Gratuitamente!",
             description: "Sua empresa está isenta de pagamento. A vaga já está ativa!",
           });
           onSave();
         } else {
-          // Show payment modal
+          console.log('Company requires payment, showing payment modal');
           toast({
             title: "✅ Vaga Publicada!",
             description: "Sua vaga foi publicada! Realize o pagamento PIX para manter ativa.",
@@ -206,11 +239,20 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
           setShowPaymentModal(true);
         }
       }
-    } catch (error) {
-      console.error('Error saving job:', error);
+    } catch (error: any) {
+      console.error('=== ERROR SAVING JOB ===');
+      console.error('Error details:', error);
+      
+      let errorMessage = "Erro desconhecido ao salvar vaga";
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
       toast({
-        title: "Erro",
-        description: "Erro ao salvar vaga. Verifique os dados e tente novamente.",
+        title: "❌ Erro ao salvar vaga",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -426,13 +468,14 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
                   </div>
 
                   <div>
-                    <Label htmlFor="contact_info" className="text-base font-semibold">Informação de Contato</Label>
+                    <Label htmlFor="contact_info" className="text-base font-semibold">Informação de Contato *</Label>
                     <Input
                       id="contact_info"
                       value={formData.contact_info}
                       onChange={(e) => handleInputChange("contact_info", e.target.value)}
                       placeholder="Ex: (42) 9999-9999 ou email@empresa.com"
                       className="mt-2 h-12 rounded-xl"
+                      required={formData.has_external_application}
                     />
                   </div>
                 </div>

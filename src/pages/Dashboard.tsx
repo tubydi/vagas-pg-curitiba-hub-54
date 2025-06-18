@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -44,12 +43,13 @@ const Dashboard = () => {
     refreshData
   } = useCompanyData(user?.id);
 
+  // Auto-refresh when user changes and no company is loaded
   useEffect(() => {
-    if (user && !companyLoading && !company && !companyError) {
-      console.log('Dashboard: Triggering data refresh for user:', user.email);
+    if (user?.email && !company && !companyLoading && !companyError) {
+      console.log('Dashboard: User loaded but no company, triggering refresh');
       refreshData(user.email);
     }
-  }, [user, company, companyLoading, companyError, refreshData]);
+  }, [user?.email, company, companyLoading, companyError, refreshData]);
 
   const handleLogout = async () => {
     try {
@@ -61,13 +61,16 @@ const Dashboard = () => {
   };
 
   const handleJobSaved = () => {
-    console.log('Job saved, refreshing data...');
-    refreshData(user?.email);
+    console.log('Job saved, refreshing dashboard data...');
+    if (user?.email) {
+      refreshData(user.email);
+    }
     setActiveTab("jobs");
     setSelectedJob(null);
   };
 
   const handleEditJob = (job: Job) => {
+    console.log('Editing job:', job);
     setSelectedJob(job);
     setActiveTab("new-job");
   };
@@ -75,23 +78,35 @@ const Dashboard = () => {
   const handleDeleteJob = async (jobId: string) => {
     if (!confirm("Tem certeza que deseja excluir esta vaga?")) return;
 
-    const { error } = await supabase
-      .from('jobs')
-      .delete()
-      .eq('id', jobId);
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .delete()
+        .eq('id', jobId);
 
-    if (error) {
+      if (error) {
+        console.error('Error deleting job:', error);
+        toast({
+          title: "❌ Erro",
+          description: `Erro ao excluir vaga: ${error.message}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "✅ Sucesso",
+          description: "Vaga excluída com sucesso!",
+        });
+        if (user?.email) {
+          refreshData(user.email);
+        }
+      }
+    } catch (error) {
+      console.error('Unexpected error deleting job:', error);
       toast({
-        title: "Erro",
-        description: "Erro ao excluir vaga.",
+        title: "❌ Erro inesperado",
+        description: "Falha ao excluir vaga",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Sucesso",
-        description: "Vaga excluída com sucesso!",
-      });
-      refreshData(user?.email);
     }
   };
 
@@ -105,7 +120,9 @@ const Dashboard = () => {
       title: "✅ Pagamento Confirmado!",
       description: "Obrigado! Todas as suas vagas estão agora em dia.",
     });
-    refreshData(user?.email);
+    if (user?.email) {
+      refreshData(user.email);
+    }
   };
 
   // Show loading if auth is loading
@@ -114,7 +131,7 @@ const Dashboard = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando dashboard...</p>
+          <p className="text-gray-600">Carregando autenticação...</p>
         </div>
       </div>
     );
@@ -122,6 +139,7 @@ const Dashboard = () => {
 
   // Redirect if not authenticated
   if (!user) {
+    console.log('No user found, redirecting to auth');
     return <Navigate to="/auth" replace />;
   }
 
@@ -131,30 +149,70 @@ const Dashboard = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Preparando sua empresa...</p>
+          <p className="text-gray-600">Carregando dados da empresa...</p>
+          <p className="text-sm text-gray-500 mt-2">Usuário: {user.email}</p>
         </div>
       </div>
     );
   }
 
   // Show error if company couldn't be loaded/created
-  if (companyError || (!company && !companyLoading)) {
+  if (companyError) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Problema com a empresa</h2>
-            <p className="text-gray-600 mb-6">
-              {companyError || "Sua empresa não foi encontrada no sistema."}
-            </p>
+            <p className="text-gray-600 mb-2">Usuário: {user.email}</p>
+            <p className="text-gray-600 mb-6 text-sm">{companyError}</p>
             
             <div className="space-y-3">
               <Button 
-                onClick={() => refreshData(user.email)}
+                onClick={() => {
+                  console.log('Manual refresh triggered by user');
+                  refreshData(user.email);
+                }}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
                 Tentar Novamente
+              </Button>
+              
+              <Button 
+                onClick={handleLogout}
+                variant="outline"
+                className="w-full"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Fazer Logout
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error if no company found
+  if (!company) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 text-center">
+            <Building2 className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Empresa não encontrada</h2>
+            <p className="text-gray-600 mb-2">Usuário: {user.email}</p>
+            <p className="text-gray-600 mb-6 text-sm">Tentando criar empresa automaticamente...</p>
+            
+            <div className="space-y-3">
+              <Button 
+                onClick={() => {
+                  console.log('Manual company creation triggered');
+                  refreshData(user.email);
+                }}
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                Criar Empresa
               </Button>
               
               <Button 
@@ -179,6 +237,8 @@ const Dashboard = () => {
     company?.email !== 'admin@vagaspg.com'
   ).length;
 
+  console.log('Dashboard render - Company:', company.name, 'Jobs:', jobs.length);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-gradient-to-r from-green-500 to-green-600 text-white">
@@ -191,6 +251,7 @@ const Dashboard = () => {
               <div>
                 <h1 className="text-3xl font-bold">Dashboard - Empresa</h1>
                 <p className="text-green-100">Painel da Empresa: {company.name}</p>
+                <p className="text-green-200 text-sm">Email: {company.email}</p>
               </div>
             </div>
             <Button

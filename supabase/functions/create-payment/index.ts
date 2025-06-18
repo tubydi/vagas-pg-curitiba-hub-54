@@ -203,7 +203,7 @@ serve(async (req) => {
         ...jobData,
         company_id: companyId,
         payment_status: 'pending',
-        status: 'Pendente'
+        status: 'Pausada'
       }])
       .select()
       .single()

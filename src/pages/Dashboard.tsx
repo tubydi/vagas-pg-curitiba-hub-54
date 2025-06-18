@@ -18,7 +18,8 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  CreditCard
+  CreditCard,
+  LogOut
 } from "lucide-react";
 import EnhancedJobForm from "@/components/EnhancedJobForm";
 import CandidatesList from "@/components/CandidatesList";
@@ -28,7 +29,7 @@ type Job = Database['public']['Tables']['jobs']['Row'];
 type Company = Database['public']['Tables']['companies']['Row'];
 
 const Dashboard = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
@@ -154,6 +155,19 @@ const Dashboard = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Erro no logout:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao fazer logout. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getJobStatusInfo = (job: Job) => {
     const paymentStatus = job.payment_status;
     const jobStatus = job.status;
@@ -252,14 +266,24 @@ const Dashboard = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-gradient-to-r from-green-500 to-green-600 text-white">
         <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center space-x-4">
-            <div className="bg-white/20 p-3 rounded-xl">
-              <Building2 className="h-8 w-8" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="bg-white/20 p-3 rounded-xl">
+                <Building2 className="h-8 w-8" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">Dashboard - Empresa</h1>
+                <p className="text-green-100">Painel da Empresa: {company.name}</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold">Dashboard - Empresa</h1>
-              <p className="text-green-100">Painel da Empresa: {company.name}</p>
-            </div>
+            <Button
+              onClick={handleLogout}
+              variant="ghost"
+              className="text-white hover:bg-white/20 rounded-xl"
+            >
+              <LogOut className="w-5 h-5 mr-2" />
+              Sair
+            </Button>
           </div>
         </div>
       </div>

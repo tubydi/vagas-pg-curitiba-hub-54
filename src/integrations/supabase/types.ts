@@ -135,6 +135,8 @@ export type Database = {
           has_external_application: boolean | null
           id: string
           location: string
+          payment_id: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
           requirements: string
           salary: string
           status: Database["public"]["Enums"]["job_status"]
@@ -154,6 +156,8 @@ export type Database = {
           has_external_application?: boolean | null
           id?: string
           location: string
+          payment_id?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
           requirements: string
           salary: string
           status?: Database["public"]["Enums"]["job_status"]
@@ -173,6 +177,8 @@ export type Database = {
           has_external_application?: boolean | null
           id?: string
           location?: string
+          payment_id?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
           requirements?: string
           salary?: string
           status?: Database["public"]["Enums"]["job_status"]
@@ -186,6 +192,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
             referencedColumns: ["id"]
           },
         ]
@@ -232,6 +245,63 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          id: string
+          job_id: string | null
+          mercadopago_data: Json | null
+          paid_at: string | null
+          payment_id: string | null
+          preference_id: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          company_id: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          mercadopago_data?: Json | null
+          paid_at?: string | null
+          payment_id?: string | null
+          preference_id?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          mercadopago_data?: Json | null
+          paid_at?: string | null
+          payment_id?: string | null
+          preference_id?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -265,6 +335,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      is_exempt_from_payment: {
+        Args: { company_email: string }
+        Returns: boolean
+      }
     }
     Enums: {
       application_status:
@@ -282,6 +356,7 @@ export type Database = {
         | "Sênior"
         | "Especialista"
       job_status: "Ativa" | "Pausada" | "Fechada"
+      payment_status: "pending" | "approved" | "rejected" | "cancelled"
       user_role: "admin" | "company"
       work_mode: "Presencial" | "Remoto" | "Híbrido"
     }
@@ -416,6 +491,7 @@ export const Constants = {
         "Especialista",
       ],
       job_status: ["Ativa", "Pausada", "Fechada"],
+      payment_status: ["pending", "approved", "rejected", "cancelled"],
       user_role: ["admin", "company"],
       work_mode: ["Presencial", "Remoto", "Híbrido"],
     },

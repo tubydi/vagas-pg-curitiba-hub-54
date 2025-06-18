@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { X } from "lucide-react";
+import { X, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/integrations/supabase/types";
 import PixPaymentModal from "./PixPaymentModal";
+import AIJobExtractor from "./AIJobExtractor";
 
 type ContractType = Database["public"]["Enums"]["contract_type"];
 type WorkMode = Database["public"]["Enums"]["work_mode"];
@@ -31,6 +31,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [createdJobId, setCreatedJobId] = useState<string | null>(null);
   const [companyEmail, setCompanyEmail] = useState<string>("");
+  const [showAIExtractor, setShowAIExtractor] = useState(false);
   
   const [formData, setFormData] = useState({
     title: "",
@@ -87,6 +88,32 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
     } catch (error) {
       console.error('Erro ao buscar email da empresa:', error);
     }
+  };
+
+  const handleAIExtraction = (extractedData: any) => {
+    console.log('Dados extraídos pela IA:', extractedData);
+    
+    // Preencher o formulário com os dados extraídos
+    setFormData({
+      title: extractedData.title || "",
+      description: extractedData.description || "",
+      requirements: extractedData.requirements || "",
+      salary: extractedData.salary || "",
+      location: extractedData.location || "Ponta Grossa",
+      contract_type: extractedData.contract_type || "CLT",
+      work_mode: extractedData.work_mode || "Presencial",
+      experience_level: extractedData.experience_level || "Júnior",
+      has_external_application: extractedData.has_external_application || false,
+      application_method: extractedData.application_method || "",
+      contact_info: extractedData.contact_info || ""
+    });
+
+    // Preencher benefícios se existirem
+    if (extractedData.benefits && Array.isArray(extractedData.benefits)) {
+      setBenefitsList(extractedData.benefits);
+    }
+
+    setShowAIExtractor(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -218,13 +245,34 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
     onSave();
   };
 
+  if (showAIExtractor) {
+    return (
+      <AIJobExtractor
+        onExtracted={handleAIExtraction}
+        onClose={() => setShowAIExtractor(false)}
+      />
+    );
+  }
+
   return (
     <>
       <Card className="border-0 rounded-3xl shadow-2xl">
         <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-3xl">
-          <CardTitle className="text-2xl font-bold text-center">
-            {job ? "Editar Vaga" : "Nova Vaga"}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-2xl font-bold">
+              {job ? "Editar Vaga" : "Nova Vaga"}
+            </CardTitle>
+            {!job && (
+              <Button
+                onClick={() => setShowAIExtractor(true)}
+                variant="outline"
+                className="bg-white/20 border-white/30 text-white hover:bg-white/30"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                🤖 IA
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-8">
           <form onSubmit={handleSubmit} className="space-y-8">

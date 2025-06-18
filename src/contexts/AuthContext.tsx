@@ -31,26 +31,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      setUser(session?.user || null);
-      setLoading(false);
-
-      if (session?.user) {
-        fetchIsAdmin(session.user.id);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user || null);
+        if (session?.user) {
+          await fetchIsAdmin(session.user.id);
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
     checkSession();
 
-    supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
       setUser(session?.user || null);
+      
       if (session?.user) {
-        fetchIsAdmin(session.user.id);
+        await fetchIsAdmin(session.user.id);
       } else {
         setIsAdmin(false);
       }
     });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const fetchIsAdmin = async (userId: string) => {
@@ -89,22 +96,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
         throw error;
       }
+      
       toast({
         title: "Login realizado",
         description: "Bem-vindo!",
       });
     } catch (error) {
       console.error('Login error:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
   const signUp = async (email: string, password: string, companyData: any) => {
+    console.log('=== INICIANDO CADASTRO ===');
+    console.log('Email:', email);
+    console.log('Company Data:', companyData);
+    
     try {
-      console.log('Iniciando cadastro para:', email);
-      
       // Primeiro criar o usuário
+      console.log('1. Criando usuário...');
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -122,6 +134,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (!authData.user) {
         const error = new Error('Usuário não foi criado');
+        console.error('Usuário não foi criado');
         toast({
           title: "Erro no cadastro",
           description: "Falha ao criar usuário",
@@ -130,19 +143,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { data: null, error };
       }
 
-      console.log('Usuário criado, criando empresa para:', authData.user.id);
+      console.log('2. Usuário criado com sucesso:', authData.user.id);
 
-      // Aguardar um pouco para garantir que o usuário foi processado
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Aguardar para garantir que o trigger do profile foi executado
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Criar empresa com dados do formulário
+      // Verificar se o profile foi criado
+      console.log('3. Verificando profile...');
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profileError) {
+        console.log('Profile não encontrado, criando manualmente...');
+        const { error: createProfileError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: authData.user.id,
+            email: email,
+            role: 'company'
+          }]);
+
+        if (createProfileError) {
+          console.error('Erro ao criar profile:', createProfileError);
+        }
+      } else {
+        console.log('Profile encontrado:', profileData);
+      }
+
+      // Criar empresa
+      console.log('4. Criando empresa...');
       const { data: companyInsertData, error: companyError } = await supabase
         .from('companies')
         .insert([{
           user_id: authData.user.id,
           name: companyData.companyName,
           cnpj: companyData.cnpj,
-          email: companyData.email,
+          email: companyData.email || email, // Usar email do form ou do auth
           phone: companyData.phone,
           address: companyData.address,
           city: companyData.city,
@@ -175,7 +214,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { data: null, error: companyError };
       }
 
-      console.log('Empresa criada com sucesso:', companyInsertData);
+      console.log('5. Empresa criada com sucesso:', companyInsertData);
 
       toast({
         title: "Cadastro realizado!",
@@ -197,14 +236,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     setLoading(true);
     try {
-      // Primeiro limpar o estado local imediatamente
       setUser(null);
       setIsAdmin(false);
       
-      // Tentar fazer logout no Supabase, mas não falhar se a sessão já foi perdida
       const { error } = await supabase.auth.signOut();
       
-      // Se o erro for relacionado à sessão não encontrada, ignorar
       if (error && !error.message.includes('session') && !error.message.includes('Session')) {
         console.error('Signout error:', error);
         toast({
@@ -213,7 +249,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           variant: "destructive",
         });
       } else {
-        // Se não há erro ou é erro de sessão, considerar logout bem-sucedido
         toast({
           title: "Logout realizado",
           description: "Você foi desconectado com sucesso.",
@@ -221,7 +256,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (error) {
       console.error('Signout error:', error);
-      // Mesmo com erro, mostrar mensagem de sucesso se o estado foi limpo
       toast({
         title: "Logout realizado",
         description: "Você foi desconectado com sucesso.",

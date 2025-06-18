@@ -336,7 +336,7 @@ export type Database = {
         Returns: string
       }
       is_exempt_from_payment: {
-        Args: { company_email: string }
+        Args: Record<PropertyKey, never> | { company_email: string }
         Returns: boolean
       }
     }

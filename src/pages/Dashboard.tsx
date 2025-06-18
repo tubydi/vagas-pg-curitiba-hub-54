@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +18,8 @@ import {
   CheckCircle,
   Clock,
   CreditCard,
-  LogOut
+  LogOut,
+  RefreshCw
 } from "lucide-react";
 import EnhancedJobForm from "@/components/EnhancedJobForm";
 import CandidatesList from "@/components/CandidatesList";
@@ -30,11 +30,14 @@ type Company = Database['public']['Tables']['companies']['Row'];
 
 const Dashboard = () => {
   const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [loadingJobs, setLoadingJobs] = useState(true);
+  const [companyError, setCompanyError] = useState<string | null>(null);
+  const [retryingCompany, setRetryingCompany] = useState(false);
   const { toast } = useToast();
 
   console.log('Dashboard - user:', user?.email, 'isAdmin:', false);
@@ -54,6 +57,7 @@ const Dashboard = () => {
     if (!user) return;
     
     try {
+      setCompanyError(null);
       console.log('Buscando empresa para user_id:', user.id);
       
       // Buscar empresa do usuário
@@ -66,36 +70,14 @@ const Dashboard = () => {
       if (companyError) {
         console.error('Error fetching company:', companyError);
         
-        // Se não encontrar empresa, criar uma empresa padrão
+        // Se não encontrar empresa, NÃO criar automaticamente
         if (companyError.code === 'PGRST116') {
-          console.log('Empresa não encontrada, criando empresa padrão...');
-          
-          const { data: newCompany, error: createError } = await supabase
-            .from('companies')
-            .insert([{
-              user_id: user.id,
-              name: 'Minha Empresa',
-              cnpj: '00.000.000/0001-00',
-              email: user.email || '',
-              phone: '(42) 99999-9999',
-              address: 'Endereço da empresa',
-              city: 'Ponta Grossa',
-              sector: 'Tecnologia',
-              legal_representative: 'Representante Legal',
-              description: 'Descrição da empresa',
-              status: 'Ativa' as const
-            }])
-            .select()
-            .single();
-            
-          if (createError) {
-            console.error('Error creating company:', createError);
-            return;
-          }
-          
-          console.log('Empresa criada:', newCompany);
-          setCompany(newCompany);
+          console.log('Empresa não encontrada para este usuário');
+          setCompanyError('Nenhuma empresa encontrada para este usuário. Você precisa completar o cadastro da empresa.');
+        } else {
+          setCompanyError(`Erro ao buscar empresa: ${companyError.message}`);
         }
+        setLoadingJobs(false);
         return;
       }
 
@@ -116,8 +98,76 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error:', error);
+      setCompanyError('Erro inesperado ao buscar dados da empresa.');
     } finally {
       setLoadingJobs(false);
+    }
+  };
+
+  const handleCreateCompany = async () => {
+    if (!user) return;
+    
+    setRetryingCompany(true);
+    try {
+      console.log('Tentando criar empresa para user_id:', user.id);
+      
+      const { data: newCompany, error: createError } = await supabase
+        .from('companies')
+        .insert([{
+          user_id: user.id,
+          name: 'Minha Empresa',
+          cnpj: '00.000.000/0001-00',
+          email: user.email || '',
+          phone: '(42) 99999-9999',
+          address: 'Endereço da empresa',
+          city: 'Ponta Grossa',
+          sector: 'Tecnologia',
+          legal_representative: 'Representante Legal',
+          description: 'Descrição da empresa',
+          status: 'Ativa' as const
+        }])
+        .select()
+        .single();
+        
+      if (createError) {
+        console.error('Error creating company:', createError);
+        setCompanyError(`Erro ao criar empresa: ${createError.message}`);
+        toast({
+          title: "Erro",
+          description: "Não foi possível criar a empresa. Tente fazer um novo cadastro.",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Empresa criada:', newCompany);
+        setCompany(newCompany);
+        setCompanyError(null);
+        toast({
+          title: "Sucesso",
+          description: "Empresa criada com sucesso!",
+        });
+      }
+    } catch (error) {
+      console.error('Error creating company:', error);
+      setCompanyError('Erro inesperado ao criar empresa.');
+    } finally {
+      setRetryingCompany(false);
+    }
+  };
+
+  const handleGoToAuth = () => {
+    navigate('/auth');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Erro no logout:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao fazer logout. Tente novamente.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -152,19 +202,6 @@ const Dashboard = () => {
         description: "Vaga excluída com sucesso!",
       });
       fetchCompanyAndJobs();
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Erro no logout:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao fazer logout. Tente novamente.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -243,19 +280,54 @@ const Dashboard = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  if (!company) {
+  // Se há erro na empresa ou empresa não existe, mostrar opções
+  if (companyError || !company) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Configurando sua conta...</h2>
-            <p className="text-gray-600 mb-4">
-              Estamos preparando sua conta empresarial.
+            <h2 className="text-xl font-semibold mb-2">Problema com a Conta</h2>
+            <p className="text-gray-600 mb-6">
+              {companyError || "Empresa não encontrada para este usuário."}
             </p>
-            <Button onClick={() => window.location.reload()}>
-              Tentar novamente
-            </Button>
+            
+            <div className="space-y-3">
+              <Button 
+                onClick={handleCreateCompany}
+                disabled={retryingCompany}
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                {retryingCompany ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Criando empresa...
+                  </>
+                ) : (
+                  <>
+                    <Building2 className="w-4 h-4 mr-2" />
+                    Criar empresa padrão
+                  </>
+                )}
+              </Button>
+              
+              <Button 
+                onClick={handleGoToAuth}
+                variant="outline"
+                className="w-full"
+              >
+                Refazer cadastro
+              </Button>
+              
+              <Button 
+                onClick={handleLogout}
+                variant="ghost"
+                className="w-full text-gray-600"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sair da conta
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

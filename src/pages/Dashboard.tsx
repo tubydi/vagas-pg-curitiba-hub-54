@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -38,14 +37,65 @@ const Dashboard = () => {
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [loadingCompany, setLoadingCompany] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [companyError, setCompanyError] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
+    if (user && !loading) {
       console.log('Dashboard: Usuário logado, buscando dados...', user.email);
       fetchCompanyAndJobs();
     }
-  }, [user]);
+  }, [user, loading]);
+
+  const createMissingCompany = async () => {
+    if (!user) return false;
+
+    console.log('Dashboard: Criando empresa ausente para usuário:', user.email);
+    
+    try {
+      // Criar empresa baseada no email do usuário
+      const isAdminUser = user.email === 'admin@vagaspg.com' || user.email === 'vagas@vagas.com';
+      
+      const companyData = {
+        user_id: user.id,
+        name: isAdminUser ? 'VAGAS PG - Administração' : 'Empresa Pendente',
+        cnpj: isAdminUser ? '00.000.000/0000-00' : '99.999.999/9999-99',
+        email: user.email,
+        phone: '(42) 0000-0000',
+        address: 'Endereço a ser preenchido',
+        city: 'Ponta Grossa',
+        sector: 'Administração',
+        legal_representative: 'Representante Legal',
+        description: isAdminUser ? 'Empresa administrativa do sistema' : 'Empresa criada automaticamente - favor atualizar dados',
+        status: isAdminUser ? 'Ativa' : 'Pendente'
+      };
+
+      const { data: newCompany, error: createError } = await supabase
+        .from('companies')
+        .insert([companyData])
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Erro ao criar empresa:', createError);
+        return false;
+      }
+
+      console.log('Dashboard: Empresa criada com sucesso:', newCompany);
+      setCompany(newCompany);
+      setCompanyError(null);
+      
+      toast({
+        title: "Empresa criada",
+        description: isAdminUser ? "Empresa administrativa criada." : "Empresa criada automaticamente. Atualize seus dados no perfil.",
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Erro ao criar empresa:', error);
+      return false;
+    }
+  };
 
   const fetchCompanyAndJobs = async () => {
     if (!user) {
@@ -57,26 +107,41 @@ const Dashboard = () => {
     
     try {
       setLoadingCompany(true);
+      setCompanyError(null);
       
       // Buscar empresa do usuário
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (companyError) {
         console.error('Erro ao buscar empresa:', companyError);
-        if (companyError.code === 'PGRST116') {
-          console.log('Dashboard: Empresa não encontrada para este usuário');
-          toast({
-            title: "Empresa não encontrada",
-            description: "Sua empresa não foi encontrada. Faça logout e cadastre-se novamente.",
-            variant: "destructive",
-          });
-        }
+        setCompanyError('Erro ao buscar dados da empresa');
         setLoadingCompany(false);
         setLoadingJobs(false);
+        return;
+      }
+
+      if (!companyData) {
+        console.log('Dashboard: Empresa não encontrada, tentando criar...');
+        
+        // Tentar criar empresa automaticamente
+        const companyCreated = await createMissingCompany();
+        
+        if (!companyCreated) {
+          setCompanyError('Empresa não encontrada e não foi possível criar automaticamente');
+          setLoadingCompany(false);
+          setLoadingJobs(false);
+          return;
+        }
+        
+        // Se chegou até aqui, a empresa foi criada com sucesso
+        // Não precisa buscar vagas ainda pois é uma empresa nova
+        setJobs([]);
+        setLoadingJobs(false);
+        setLoadingCompany(false);
         return;
       }
 
@@ -98,15 +163,17 @@ const Dashboard = () => {
           description: "Erro ao buscar suas vagas. Tente novamente.",
           variant: "destructive",
         });
+        setJobs([]);
       } else {
         console.log('Dashboard: Vagas encontradas:', jobsData?.length || 0);
         setJobs(jobsData || []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
+      setCompanyError('Erro inesperado ao carregar dados');
       toast({
         title: "Erro ao carregar dados",
-        description: "Erro ao carregar informações. Tente fazer login novamente.",
+        description: "Erro inesperado. Tente fazer login novamente.",
         variant: "destructive",
       });
     } finally {
@@ -175,7 +242,8 @@ const Dashboard = () => {
   // Contar vagas que precisam de pagamento (simulação)
   const pendingPaymentJobs = jobs.filter(job => 
     job.status === 'Ativa' && 
-    company?.email !== 'vagas@vagas.com'
+    company?.email !== 'vagas@vagas.com' &&
+    company?.email !== 'admin@vagaspg.com'
   ).length;
 
   if (loading || loadingCompany) {
@@ -193,25 +261,32 @@ const Dashboard = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  if (!company) {
+  if (companyError || !company) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Empresa não encontrada</h2>
+            <h2 className="text-xl font-semibold mb-2">Problema com a empresa</h2>
             <p className="text-gray-600 mb-6">
-              Sua empresa ainda não foi criada ou houve um erro no cadastro. 
-              Faça logout e cadastre-se novamente.
+              {companyError || 'Sua empresa não foi encontrada no sistema.'}
             </p>
             
             <div className="space-y-3">
               <Button 
+                onClick={fetchCompanyAndJobs}
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                Tentar Novamente
+              </Button>
+              
+              <Button 
                 onClick={handleLogout}
-                className="w-full bg-red-600 hover:bg-red-700"
+                variant="outline"
+                className="w-full"
               >
                 <LogOut className="w-4 h-4 mr-2" />
-                Fazer Logout e Cadastrar Novamente
+                Fazer Logout
               </Button>
             </div>
           </CardContent>

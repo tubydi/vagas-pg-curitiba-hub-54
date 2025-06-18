@@ -102,57 +102,94 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUp = async (email: string, password: string, companyData: any) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
+      console.log('Iniciando cadastro para:', email);
+      
+      // Primeiro criar o usuário
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
       });
 
-      if (error) {
+      if (authError) {
+        console.error('Erro na criação do usuário:', authError);
         toast({
           title: "Erro no cadastro",
-          description: error.message,
+          description: authError.message,
           variant: "destructive",
         });
-        throw error;
+        return { data: null, error: authError };
       }
 
-      if (data.user) {
-        // Criar empresa com status 'Ativa' automaticamente
-        const { error: companyError } = await supabase
-          .from('companies')
-          .insert([{
-            user_id: data.user.id,
-            name: companyData.companyName,
-            cnpj: companyData.cnpj,
-            email: companyData.email,
-            phone: companyData.phone,
-            address: companyData.address,
-            city: companyData.city,
-            sector: companyData.sector,
-            legal_representative: companyData.legalRepresentative,
-            description: companyData.description || '',
-            status: 'Ativa' // Empresa ativa automaticamente
-          }]);
+      if (!authData.user) {
+        const error = new Error('Usuário não foi criado');
+        toast({
+          title: "Erro no cadastro",
+          description: "Falha ao criar usuário",
+          variant: "destructive",
+        });
+        return { data: null, error };
+      }
 
-        if (companyError) {
-          console.error('Error creating company:', companyError);
+      console.log('Usuário criado, criando empresa para:', authData.user.id);
+
+      // Aguardar um pouco para garantir que o usuário foi processado
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Criar empresa com dados do formulário
+      const { data: companyInsertData, error: companyError } = await supabase
+        .from('companies')
+        .insert([{
+          user_id: authData.user.id,
+          name: companyData.companyName,
+          cnpj: companyData.cnpj,
+          email: companyData.email,
+          phone: companyData.phone,
+          address: companyData.address,
+          city: companyData.city,
+          sector: companyData.sector,
+          legal_representative: companyData.legalRepresentative,
+          description: companyData.description || '',
+          status: 'Ativa' // Empresa ativa automaticamente
+        }])
+        .select()
+        .single();
+
+      if (companyError) {
+        console.error('Erro na criação da empresa:', companyError);
+        
+        // Se for erro de CNPJ duplicado, mostrar mensagem específica
+        if (companyError.code === '23505' && companyError.message.includes('companies_cnpj_key')) {
+          toast({
+            title: "CNPJ já cadastrado",
+            description: "Este CNPJ já está cadastrado no sistema. Tente fazer login ou use outro CNPJ.",
+            variant: "destructive",
+          });
+        } else {
           toast({
             title: "Erro ao criar empresa",
             description: "Erro ao salvar dados da empresa. Tente novamente.",
             variant: "destructive",
           });
-          throw companyError;
         }
-
-        toast({
-          title: "Cadastro realizado!",
-          description: "Sua empresa foi cadastrada e ativada automaticamente. Você já pode publicar vagas!",
-        });
+        
+        return { data: null, error: companyError };
       }
 
-      return { data, error: null };
+      console.log('Empresa criada com sucesso:', companyInsertData);
+
+      toast({
+        title: "Cadastro realizado!",
+        description: "Sua empresa foi cadastrada e ativada automaticamente. Você já pode publicar vagas!",
+      });
+
+      return { data: authData, error: null };
     } catch (error) {
-      console.error('Signup error:', error);
+      console.error('Erro inesperado no cadastro:', error);
+      toast({
+        title: "Erro no cadastro",
+        description: "Erro inesperado. Tente novamente.",
+        variant: "destructive",
+      });
       return { data: null, error };
     }
   };

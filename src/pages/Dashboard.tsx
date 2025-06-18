@@ -18,8 +18,7 @@ import {
   CheckCircle,
   Clock,
   CreditCard,
-  LogOut,
-  RefreshCw
+  LogOut
 } from "lucide-react";
 import EnhancedJobForm from "@/components/EnhancedJobForm";
 import CandidatesList from "@/components/CandidatesList";
@@ -36,19 +35,13 @@ const Dashboard = () => {
   const [company, setCompany] = useState<Company | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [loadingJobs, setLoadingJobs] = useState(true);
-  const [companyError, setCompanyError] = useState<string | null>(null);
-  const [retryingCompany, setRetryingCompany] = useState(false);
   const { toast } = useToast();
 
   console.log('Dashboard - user:', user?.email, 'isAdmin:', false);
-  console.log('VERIFICAÇÃO FINAL - isAdmin:', false, 'user email:', user?.email);
-  console.log('RENDERIZANDO PAINEL DE EMPRESA - USUÁRIO NÃO É ADMIN');
-  console.log('Renderizando painel de EMPRESA');
 
   useEffect(() => {
     if (user) {
-      console.log('Usuário no dashboard:', user.email, 'É ADMIN?', false);
-      console.log('Usuário é empresa - buscando dados...');
+      console.log('Usuário no dashboard:', user.email);
       fetchCompanyAndJobs();
     }
   }, [user]);
@@ -57,7 +50,6 @@ const Dashboard = () => {
     if (!user) return;
     
     try {
-      setCompanyError(null);
       console.log('Buscando empresa para user_id:', user.id);
       
       // Buscar empresa do usuário
@@ -70,13 +62,17 @@ const Dashboard = () => {
       if (companyError) {
         console.error('Error fetching company:', companyError);
         
-        // Se não encontrar empresa, NÃO criar automaticamente
         if (companyError.code === 'PGRST116') {
-          console.log('Empresa não encontrada para este usuário');
-          setCompanyError('Nenhuma empresa encontrada para este usuário. Você precisa completar o cadastro da empresa.');
-        } else {
-          setCompanyError(`Erro ao buscar empresa: ${companyError.message}`);
+          console.log('Empresa não encontrada - redirecionando para cadastro');
+          toast({
+            title: "Empresa não encontrada",
+            description: "Complete seu cadastro criando uma nova conta.",
+            variant: "destructive",
+          });
+          navigate('/auth');
+          return;
         }
+        
         setLoadingJobs(false);
         return;
       }
@@ -98,76 +94,17 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error:', error);
-      setCompanyError('Erro inesperado ao buscar dados da empresa.');
     } finally {
       setLoadingJobs(false);
     }
   };
 
-  const handleCreateCompany = async () => {
-    if (!user) return;
-    
-    setRetryingCompany(true);
-    try {
-      console.log('Tentando criar empresa para user_id:', user.id);
-      
-      const { data: newCompany, error: createError } = await supabase
-        .from('companies')
-        .insert([{
-          user_id: user.id,
-          name: 'Minha Empresa',
-          cnpj: '00.000.000/0001-00',
-          email: user.email || '',
-          phone: '(42) 99999-9999',
-          address: 'Endereço da empresa',
-          city: 'Ponta Grossa',
-          sector: 'Tecnologia',
-          legal_representative: 'Representante Legal',
-          description: 'Descrição da empresa',
-          status: 'Ativa' as const
-        }])
-        .select()
-        .single();
-        
-      if (createError) {
-        console.error('Error creating company:', createError);
-        setCompanyError(`Erro ao criar empresa: ${createError.message}`);
-        toast({
-          title: "Erro",
-          description: "Não foi possível criar a empresa. Tente fazer um novo cadastro.",
-          variant: "destructive",
-        });
-      } else {
-        console.log('Empresa criada:', newCompany);
-        setCompany(newCompany);
-        setCompanyError(null);
-        toast({
-          title: "Sucesso",
-          description: "Empresa criada com sucesso!",
-        });
-      }
-    } catch (error) {
-      console.error('Error creating company:', error);
-      setCompanyError('Erro inesperado ao criar empresa.');
-    } finally {
-      setRetryingCompany(false);
-    }
-  };
-
-  const handleGoToAuth = () => {
-    navigate('/auth');
-  };
-
   const handleLogout = async () => {
     try {
       await signOut();
+      navigate('/');
     } catch (error) {
       console.error('Erro no logout:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao fazer logout. Tente novamente.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -280,43 +217,24 @@ const Dashboard = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  // Se há erro na empresa ou empresa não existe, mostrar opções
-  if (companyError || !company) {
+  if (!company) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Problema com a Conta</h2>
+            <h2 className="text-xl font-semibold mb-2">Empresa não encontrada</h2>
             <p className="text-gray-600 mb-6">
-              {companyError || "Empresa não encontrada para este usuário."}
+              Não foi possível encontrar sua empresa. Faça um novo cadastro.
             </p>
             
             <div className="space-y-3">
               <Button 
-                onClick={handleCreateCompany}
-                disabled={retryingCompany}
+                onClick={() => navigate('/auth')}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
-                {retryingCompany ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Criando empresa...
-                  </>
-                ) : (
-                  <>
-                    <Building2 className="w-4 h-4 mr-2" />
-                    Criar empresa padrão
-                  </>
-                )}
-              </Button>
-              
-              <Button 
-                onClick={handleGoToAuth}
-                variant="outline"
-                className="w-full"
-              >
-                Refazer cadastro
+                <Building2 className="w-4 h-4 mr-2" />
+                Fazer novo cadastro
               </Button>
               
               <Button 

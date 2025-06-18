@@ -28,34 +28,35 @@ type Job = Database['public']['Tables']['jobs']['Row'];
 type Company = Database['public']['Tables']['companies']['Row'];
 
 const Dashboard = () => {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [loadingJobs, setLoadingJobs] = useState(true);
-  const [loadingCompany, setLoadingCompany] = useState(true);
+  const [loadingJobs, setLoadingJobs] = useState(false);
+  const [loadingCompany, setLoadingCompany] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [companyError, setCompanyError] = useState<string | null>(null);
-  const [creatingCompany, setCreatingCompany] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const { toast } = useToast();
 
+  // Só inicializa quando tem usuário e auth não está loading
   useEffect(() => {
-    if (user && !loading) {
-      console.log('Dashboard: Usuário logado, buscando dados...', user.email);
+    if (!authLoading && user && !isInitialized) {
+      console.log('Dashboard: Inicializando para usuário:', user.email);
+      setIsInitialized(true);
       fetchCompanyAndJobs();
+    } else if (!authLoading && !user) {
+      console.log('Dashboard: Sem usuário, redirecionando...');
     }
-  }, [user, loading]);
+  }, [user, authLoading, isInitialized]);
 
   const createMissingCompany = async () => {
     if (!user) return false;
 
     console.log('Dashboard: Criando empresa para usuário:', user.email);
-    setCreatingCompany(true);
     
     try {
-      // Criar empresa baseada no email do usuário
       const isAdminUser = user.email === 'admin@vagaspg.com' || user.email === 'vagas@vagas.com';
       
       const companyData = {
@@ -69,7 +70,7 @@ const Dashboard = () => {
         sector: 'Administração',
         legal_representative: 'Representante Legal',
         description: isAdminUser ? 'Empresa administrativa do sistema' : 'Empresa criada automaticamente - favor atualizar dados no perfil',
-        status: 'Ativa' as const // Definir explicitamente o tipo correto
+        status: 'Ativa' as const
       };
 
       const { data: newCompany, error: createError } = await supabase
@@ -85,7 +86,6 @@ const Dashboard = () => {
 
       console.log('Dashboard: Empresa criada com sucesso:', newCompany);
       setCompany(newCompany);
-      setCompanyError(null);
       
       toast({
         title: "Empresa criada com sucesso!",
@@ -96,8 +96,6 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Erro ao criar empresa:', error);
       return false;
-    } finally {
-      setCreatingCompany(false);
     }
   };
 
@@ -111,7 +109,6 @@ const Dashboard = () => {
     
     try {
       setLoadingCompany(true);
-      setCompanyError(null);
       
       // Buscar empresa do usuário
       const { data: companyData, error: companyError } = await supabase
@@ -122,28 +119,26 @@ const Dashboard = () => {
 
       if (companyError) {
         console.error('Erro ao buscar empresa:', companyError);
-        setCompanyError('Erro ao buscar dados da empresa');
         setLoadingCompany(false);
-        setLoadingJobs(false);
         return;
       }
 
       if (!companyData) {
         console.log('Dashboard: Empresa não encontrada, criando automaticamente...');
         
-        // Criar empresa automaticamente
         const companyCreated = await createMissingCompany();
         
         if (!companyCreated) {
-          setCompanyError('Empresa não encontrada e não foi possível criar automaticamente');
+          toast({
+            title: "Erro",
+            description: "Não foi possível criar sua empresa automaticamente.",
+            variant: "destructive",
+          });
           setLoadingCompany(false);
-          setLoadingJobs(false);
           return;
         }
         
-        // Se chegou até aqui, a empresa foi criada com sucesso
         setJobs([]);
-        setLoadingJobs(false);
         setLoadingCompany(false);
         return;
       }
@@ -173,7 +168,6 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching data:', error);
-      setCompanyError('Erro inesperado ao carregar dados');
       toast({
         title: "Erro ao carregar dados",
         description: "Erro inesperado. Tente fazer login novamente.",
@@ -242,31 +236,37 @@ const Dashboard = () => {
     fetchCompanyAndJobs();
   };
 
-  // Contar vagas que precisam de pagamento (simulação)
-  const pendingPaymentJobs = jobs.filter(job => 
-    job.status === 'Ativa' && 
-    company?.email !== 'vagas@vagas.com' &&
-    company?.email !== 'admin@vagaspg.com'
-  ).length;
-
-  if (loading || loadingCompany || creatingCompany) {
+  // Mostrar loading apenas se auth estiver loading ou se está inicializando
+  if (authLoading || (user && !isInitialized)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">
-            {creatingCompany ? 'Criando sua empresa...' : 'Carregando suas informações...'}
-          </p>
+          <p className="text-gray-600">Carregando dashboard...</p>
         </div>
       </div>
     );
   }
 
-  if (!user) {
+  // Redirecionamento se não autenticado
+  if (!authLoading && !user) {
     return <Navigate to="/auth" replace />;
   }
 
-  if (companyError || !company) {
+  // Mostrar loading se estiver carregando empresa
+  if (loadingCompany && !company) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Preparando sua empresa...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não tem empresa e não está carregando, mostrar erro
+  if (!company && !loadingCompany) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -274,7 +274,7 @@ const Dashboard = () => {
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Problema com a empresa</h2>
             <p className="text-gray-600 mb-6">
-              {companyError || 'Sua empresa não foi encontrada no sistema.'}
+              Sua empresa não foi encontrada no sistema.
             </p>
             
             <div className="space-y-3">
@@ -299,6 +299,13 @@ const Dashboard = () => {
       </div>
     );
   }
+
+  // Contar vagas que precisam de pagamento (simulação)
+  const pendingPaymentJobs = jobs.filter(job => 
+    job.status === 'Ativa' && 
+    company?.email !== 'vagas@vagas.com' &&
+    company?.email !== 'admin@vagaspg.com'
+  ).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -397,7 +404,6 @@ const Dashboard = () => {
         {/* Tab Content */}
         {activeTab === "overview" && (
           <div className="space-y-8">
-            {/* Company Statistics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -406,9 +412,7 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{jobs.length}</div>
-                  <p className="text-xs text-muted-foreground">
-                    vagas publicadas
-                  </p>
+                  <p className="text-xs text-muted-foreground">vagas publicadas</p>
                 </CardContent>
               </Card>
               
@@ -421,9 +425,7 @@ const Dashboard = () => {
                   <div className="text-2xl font-bold">
                     {jobs.filter(job => job.status === 'Ativa').length}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    recebendo candidaturas
-                  </p>
+                  <p className="text-xs text-muted-foreground">recebendo candidaturas</p>
                 </CardContent>
               </Card>
               
@@ -438,14 +440,11 @@ const Dashboard = () => {
                       {company.status}
                     </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    conta empresarial
-                  </p>
+                  <p className="text-xs text-muted-foreground">conta empresarial</p>
                 </CardContent>
               </Card>
             </div>
             
-            {/* Company Info */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">

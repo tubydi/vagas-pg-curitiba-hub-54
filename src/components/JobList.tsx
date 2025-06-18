@@ -59,104 +59,77 @@ const JobList = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // BUSCA AUTOMÁTICA APRIMORADA - SEM BOTÃO RECARREGAR
   const fetchJobs = async () => {
     try {
-      console.log('🔍 Executando busca AUTOMÁTICA APRIMORADA de vagas...');
+      console.log('Executando busca de vagas...');
       setLoading(true);
       
-      // Primeira tentativa - busca completa com JOIN
-      const { data, error } = await supabase
+      // Primeira tentativa - busca direta das vagas com status ativo
+      const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
-        .select(`
-          *,
-          companies!inner (
-            id,
-            name,
-            city,
-            sector,
-            email,
-            phone
-          )
-        `)
+        .select('*')
         .eq('status', 'Ativa')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('❌ Erro na busca principal:', error);
-        
-        // TENTATIVA ALTERNATIVA - busca separada
-        console.log('🔄 Executando busca alternativa...');
-        const { data: jobsData, error: jobsError } = await supabase
-          .from('jobs')
-          .select('*')
-          .eq('status', 'Ativa')
-          .order('created_at', { ascending: false });
-
-        if (jobsError) {
-          console.error('❌ Erro na busca alternativa:', jobsError);
-          toast({
-            title: "Erro ao carregar vagas",
-            description: "Não foi possível carregar as vagas. Tente novamente.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        if (jobsData && jobsData.length > 0) {
-          // Buscar dados das empresas separadamente
-          const companyIds = [...new Set(jobsData.map(job => job.company_id))];
-          const { data: companiesData } = await supabase
-            .from('companies')
-            .select('id, name, city, sector, email, phone')
-            .in('id', companyIds);
-
-          // Mapear vagas com dados das empresas
-          const jobsWithCompanies = jobsData.map(job => ({
-            ...job,
-            has_external_application: job.has_external_application || false,
-            application_method: job.application_method || null,
-            contact_info: job.contact_info || null,
-            companies: companiesData?.find(c => c.id === job.company_id) || {
-              id: job.company_id,
-              name: 'Empresa não encontrada',
-              city: 'N/A',
-              sector: 'N/A'
-            }
-          }));
-
-          console.log('✅ Busca alternativa funcionou:', jobsWithCompanies.length, 'vagas');
-          setJobs(jobsWithCompanies);
-        }
+      if (jobsError) {
+        console.error('Erro na busca de vagas:', jobsError);
+        toast({
+          title: "Erro ao carregar vagas",
+          description: "Não foi possível carregar as vagas. Tente novamente.",
+          variant: "destructive",
+        });
         return;
       }
 
-      console.log('✅ Vagas encontradas:', data?.length || 0, 'vagas');
-      console.log('📋 Dados das vagas:', data);
-      
-      if (data && data.length > 0) {
-        const mappedJobs = data.map(job => ({
+      console.log('Vagas encontradas:', jobsData?.length || 0);
+      console.log('Dados das vagas:', jobsData);
+
+      if (jobsData && jobsData.length > 0) {
+        // Buscar dados das empresas separadamente
+        const companyIds = [...new Set(jobsData.map(job => job.company_id))];
+        console.log('IDs das empresas:', companyIds);
+        
+        const { data: companiesData, error: companiesError } = await supabase
+          .from('companies')
+          .select('id, name, city, sector, email, phone')
+          .in('id', companyIds);
+
+        if (companiesError) {
+          console.error('Erro ao buscar empresas:', companiesError);
+        }
+
+        console.log('Empresas encontradas:', companiesData?.length || 0);
+
+        // Mapear vagas com dados das empresas
+        const jobsWithCompanies = jobsData.map(job => ({
           ...job,
           has_external_application: job.has_external_application || false,
           application_method: job.application_method || null,
-          contact_info: job.contact_info || null
+          contact_info: job.contact_info || null,
+          companies: companiesData?.find(c => c.id === job.company_id) || {
+            id: job.company_id,
+            name: 'Empresa não encontrada',
+            city: 'N/A',
+            sector: 'N/A'
+          }
         }));
-        
-        setJobs(mappedJobs);
-        console.log('🎯 Total de vagas configuradas:', mappedJobs.length);
+
+        console.log('Vagas com empresas mapeadas:', jobsWithCompanies.length);
+        setJobs(jobsWithCompanies);
       } else {
-        console.log('⚠️ Nenhuma vaga ativa encontrada');
+        console.log('Nenhuma vaga ativa encontrada');
+        setJobs([]);
         
         // Verificação adicional - contar total de vagas
         const { count } = await supabase
           .from('jobs')
           .select('*', { count: 'exact', head: true });
           
-        console.log('📊 Total de vagas no banco (todas):', count);
+        console.log('Total de vagas no banco (todas):', count);
       }
       
     } catch (error) {
-      console.error('❌ Erro inesperado ao buscar vagas:', error);
+      console.error('Erro inesperado ao buscar vagas:', error);
       toast({
         title: "Erro inesperado",
         description: "Ocorreu um erro inesperado. Tente recarregar a página.",
@@ -167,14 +140,13 @@ const JobList = () => {
     }
   };
 
-  // BUSCA AUTOMÁTICA - executar ao carregar e a cada 30 segundos
   useEffect(() => {
-    console.log('🔄 Iniciando busca automática de vagas...');
+    console.log('Iniciando busca automática de vagas...');
     fetchJobs();
     
     // Busca automática a cada 30 segundos
     const interval = setInterval(() => {
-      console.log('🔄 Executando busca automática periódica');
+      console.log('Executando busca automática periódica');
       fetchJobs();
     }, 30000);
 
@@ -204,7 +176,7 @@ const JobList = () => {
       window.open(phoneUrl, '_blank');
     } else {
       toast({
-        title: "📞 Informações de Contato",
+        title: "Informações de Contato",
         description: `${application_method}: ${contact_info}`,
       });
     }
@@ -243,7 +215,7 @@ const JobList = () => {
         <div className="max-w-6xl mx-auto">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">🔍 Buscando vagas automaticamente...</p>
+            <p className="mt-4 text-gray-600">Buscando vagas automaticamente...</p>
           </div>
         </div>
       </div>
@@ -331,7 +303,7 @@ const JobList = () => {
                   onClick={fetchJobs}
                   className="mt-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl"
                 >
-                  🔍 Buscar Novamente
+                  Buscar Novamente
                 </Button>
               )}
             </CardContent>
@@ -408,7 +380,7 @@ const JobList = () => {
                       onClick={() => handleApplyJob(job)}
                       className="w-full h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-semibold text-base md:text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
                     >
-                      🌐 Candidatar-se pelo Site
+                      Candidatar-se pelo Site
                     </Button>
 
                     {/* Candidatura direta (se disponível) */}
@@ -418,12 +390,12 @@ const JobList = () => {
                         variant="outline"
                         className="w-full h-12 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 rounded-2xl font-semibold text-base md:text-lg transition-all duration-200"
                       >
-                        {job.application_method === 'WhatsApp' && '📱 '}
-                        {job.application_method === 'Email' && '📧 '}
-                        {job.application_method === 'Telefone' && '📞 '}
-                        {job.application_method === 'Presencial' && '🏢 '}
-                        {job.application_method === 'Site' && '🌐 '}
-                        {job.application_method === 'Outro' && '🔗 '}
+                        {job.application_method === 'WhatsApp' && 'WhatsApp: '}
+                        {job.application_method === 'Email' && 'Email: '}
+                        {job.application_method === 'Telefone' && 'Telefone: '}
+                        {job.application_method === 'Presencial' && 'Presencial: '}
+                        {job.application_method === 'Site' && 'Site: '}
+                        {job.application_method === 'Outro' && 'Outro: '}
                         Candidatar-se via {job.application_method}
                       </Button>
                     )}

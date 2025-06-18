@@ -50,14 +50,13 @@ const Index = () => {
   const [totalApplications] = useState(186);
   const { user } = useAuth();
 
-  // BUSCA AUTOMÁTICA DE VAGAS - SEM BOTÃO RECARREGAR
   useEffect(() => {
-    console.log('🔄 Iniciando busca automática de vagas...');
+    console.log('Iniciando busca automática de vagas...');
     fetchFeaturedJobs();
     
     // Buscar vagas a cada 30 segundos automaticamente
     const interval = setInterval(() => {
-      console.log('🔄 Busca automática de vagas executada');
+      console.log('Busca automática de vagas executada');
       fetchFeaturedJobs();
     }, 30000);
 
@@ -66,93 +65,62 @@ const Index = () => {
 
   const fetchFeaturedJobs = async () => {
     try {
-      console.log('🔍 Executando busca MELHORADA de vagas... (ACESSO PÚBLICO)');
+      console.log('Executando busca de vagas... (ACESSO PÚBLICO)');
       setLoading(true);
       
-      // NOVA ABORDAGEM - busca mais robusta
-      const { data, error } = await supabase
+      // Busca direta das vagas
+      const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
-        .select(`
-          *,
-          companies!inner (
-            id,
-            name,
-            city,
-            sector
-          )
-        `)
+        .select('*')
         .eq('status', 'Ativa')
         .order('created_at', { ascending: false })
         .limit(6);
 
-      if (error) {
-        console.error('❌ Erro ao buscar vagas em destaque:', error);
-        
-        // TENTATIVA ALTERNATIVA - busca mais simples
-        console.log('🔄 Tentando abordagem alternativa...');
-        const { data: alternativeData, error: alternativeError } = await supabase
-          .from('jobs')
-          .select('*')
-          .eq('status', 'Ativa')
-          .order('created_at', { ascending: false })
-          .limit(6);
-          
-        if (alternativeError) {
-          console.error('❌ Erro na busca alternativa:', alternativeError);
-          return;
-        }
-        
-        // Buscar dados das empresas separadamente
-        if (alternativeData && alternativeData.length > 0) {
-          const companyIds = [...new Set(alternativeData.map(job => job.company_id))];
-          const { data: companiesData } = await supabase
-            .from('companies')
-            .select('id, name, city, sector')
-            .in('id', companyIds);
-            
-          // Mapear vagas com dados das empresas
-          const jobsWithCompanies = alternativeData.map(job => ({
-            ...job,
-            companies: companiesData?.find(c => c.id === job.company_id) || {
-              id: job.company_id,
-              name: 'Empresa não encontrada',
-              city: 'N/A',
-              sector: 'N/A'
-            }
-          }));
-          
-          console.log('✅ Busca alternativa funcionou:', jobsWithCompanies.length, 'vagas');
-          setFeaturedJobs(jobsWithCompanies);
-        }
+      if (jobsError) {
+        console.error('Erro ao buscar vagas em destaque:', jobsError);
         return;
       }
 
-      console.log('✅ Vagas em destaque encontradas:', data?.length || 0, 'vagas');
-      console.log('📋 Dados completos das vagas:', data);
-      
-      if (data && data.length > 0) {
-        const mappedJobs = data.map(job => ({
+      console.log('Vagas em destaque encontradas:', jobsData?.length || 0);
+      console.log('Dados completos das vagas:', jobsData);
+
+      if (jobsData && jobsData.length > 0) {
+        // Buscar dados das empresas separadamente
+        const companyIds = [...new Set(jobsData.map(job => job.company_id))];
+        const { data: companiesData } = await supabase
+          .from('companies')
+          .select('id, name, city, sector')
+          .in('id', companyIds);
+          
+        // Mapear vagas com dados das empresas
+        const jobsWithCompanies = jobsData.map(job => ({
           ...job,
           has_external_application: job.has_external_application || false,
           application_method: job.application_method || null,
-          contact_info: job.contact_info || null
+          contact_info: job.contact_info || null,
+          companies: companiesData?.find(c => c.id === job.company_id) || {
+            id: job.company_id,
+            name: 'Empresa não encontrada',
+            city: 'N/A',
+            sector: 'N/A'
+          }
         }));
         
-        setFeaturedJobs(mappedJobs);
-        console.log('🎯 Vagas configuradas no estado:', mappedJobs.length);
+        console.log('Vagas configuradas no estado:', jobsWithCompanies.length);
+        setFeaturedJobs(jobsWithCompanies);
       } else {
-        console.log('⚠️ Nenhuma vaga encontrada no banco');
+        console.log('Nenhuma vaga encontrada no banco');
         
         // VERIFICAÇÃO ADICIONAL - contar total de vagas no banco
         const { count } = await supabase
           .from('jobs')
           .select('*', { count: 'exact', head: true });
           
-        console.log('📊 Total de vagas no banco:', count);
+        console.log('Total de vagas no banco:', count);
       }
       
     } catch (error) {
-      console.error('❌ Erro inesperado ao buscar vagas:', error);
+      console.error('Erro inesperado ao buscar vagas:', error);
     } finally {
       setLoading(false);
     }
@@ -365,7 +333,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Vagas em Destaque - BUSCA AUTOMÁTICA */}
+      {/* Vagas em Destaque */}
       <section className="py-8 md:py-20 bg-gradient-to-br from-white to-green-50 relative">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8 md:mb-12">
@@ -376,7 +344,7 @@ const Index = () => {
               Oportunidades atualizadas automaticamente
             </p>
             {loading && (
-              <p className="text-sm text-green-600 mt-2">🔄 Buscando vagas mais recentes...</p>
+              <p className="text-sm text-green-600 mt-2">Buscando vagas mais recentes...</p>
             )}
           </div>
           
@@ -396,7 +364,7 @@ const Index = () => {
                   variant="outline"
                   className="border-green-200 hover:bg-green-50"
                 >
-                  🔄 Tentar buscar novamente
+                  Tentar buscar novamente
                 </Button>
               </div>
             </div>

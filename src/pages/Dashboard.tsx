@@ -58,13 +58,39 @@ interface DashboardJob {
   requirements: string;
   salary: string;
   location: string;
-  contract_type: string;
-  work_mode: string;
-  experience_level: string;
-  status: string;
+  contract_type: ContractType;
+  work_mode: WorkMode;
+  experience_level: ExperienceLevel;
+  status: JobStatus;
   created_at: string;
   benefits: string[] | null;
   company_id: string;
+}
+
+// Job interface for the application form
+interface Job {
+  id: string;
+  title: string;
+  description: string;
+  requirements: string;
+  salary: string;
+  location: string;
+  contract_type: ContractType;
+  work_mode: WorkMode;
+  experience_level: ExperienceLevel;
+  status: JobStatus;
+  created_at: string;
+  benefits: string[] | null;
+  company_id: string;
+  companies: {
+    id: string;
+    name: string;
+    city: string;
+    sector: string;
+  };
+  has_external_application?: boolean;
+  application_method?: string;
+  contact_info?: string;
 }
 
 const Dashboard = () => {
@@ -81,17 +107,17 @@ const Dashboard = () => {
   const [latestJobs, setLatestJobs] = useState<string>("");
   const [loadingLatestJobs, setLoadingLatestJobs] = useState(false);
 
-  console.log('🏠 Dashboard - user:', user?.email, 'isAdmin:', isAdmin);
+  console.log('Dashboard - user:', user?.email, 'isAdmin:', isAdmin);
 
   useEffect(() => {
     if (user) {
-      console.log('👤 Usuário no dashboard:', user.email, 'É ADMIN?', isAdmin);
+      console.log('Usuário no dashboard:', user.email, 'É ADMIN?', isAdmin);
       
       if (isAdmin) {
-        console.log('🔑 USUÁRIO É ADMIN - NÃO BUSCANDO DADOS DE EMPRESA');
+        console.log('USUÁRIO É ADMIN - NÃO BUSCANDO DADOS DE EMPRESA');
         setLoading(false);
       } else {
-        console.log('🏢 Usuário é empresa - buscando dados...');
+        console.log('Usuário é empresa - buscando dados...');
         fetchCompanyData();
         fetchJobs();
       }
@@ -169,7 +195,7 @@ const Dashboard = () => {
       const result = await GeminiService.searchLatestJobs();
       setLatestJobs(result);
       toast({
-        title: "🔍 Busca concluída!",
+        title: "Busca concluída!",
         description: "VPG IA encontrou as vagas mais recentes do LinkedIn e Google.",
       });
     } catch (error) {
@@ -224,20 +250,17 @@ const Dashboard = () => {
     }
   };
 
-  // CORRIGINDO O BOTÃO SAIR - função melhorada
   const handleSignOut = async () => {
     try {
-      console.log('🚪 Tentando fazer logout...');
+      console.log('Tentando fazer logout...');
       
-      // Primeiro limpar estados locais
       setCompany(null);
       setJobs([]);
       
-      // Fazer logout no Supabase
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        console.error('❌ Erro no logout:', error);
+        console.error('Erro no logout:', error);
         toast({
           title: "Erro ao sair",
           description: "Não foi possível fazer logout. Tente novamente.",
@@ -246,12 +269,10 @@ const Dashboard = () => {
         return;
       }
       
-      console.log('✅ Logout realizado com sucesso');
+      console.log('Logout realizado com sucesso');
       
-      // Chamar função de logout do contexto
       await signOut();
       
-      // Navegar para home
       navigate('/');
       
       toast({
@@ -260,7 +281,7 @@ const Dashboard = () => {
       });
       
     } catch (error) {
-      console.error('❌ Erro inesperado no logout:', error);
+      console.error('Erro inesperado no logout:', error);
       toast({
         title: "Erro inesperado",
         description: "Ocorreu um erro ao fazer logout.",
@@ -269,13 +290,12 @@ const Dashboard = () => {
     }
   };
 
-  console.log('🔍 VERIFICAÇÃO FINAL - isAdmin:', isAdmin, 'user email:', user?.email);
+  console.log('VERIFICAÇÃO FINAL - isAdmin:', isAdmin, 'user email:', user?.email);
   
   if (isAdmin) {
-    console.log('🔥🔥🔥 RENDERIZANDO PAINEL ADMIN APRIMORADO');
+    console.log('RENDERIZANDO PAINEL ADMIN APRIMORADO');
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50">
-        {/* Header Admin Aprimorado */}
         <header className="bg-gradient-to-r from-green-500 to-green-600 shadow-2xl border-b border-green-200 sticky top-0 z-40">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
@@ -285,7 +305,7 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <h1 className="text-xl md:text-2xl font-bold text-white">
-                    🔥 PAINEL ADMINISTRATIVO - VAGAS PG
+                    PAINEL ADMINISTRATIVO - VAGAS PG
                   </h1>
                   <p className="text-green-100">
                     Controle Total do Sistema - {user?.email}
@@ -294,7 +314,7 @@ const Dashboard = () => {
               </div>
               <div className="flex items-center space-x-3">
                 <Badge className="bg-white text-green-600 font-bold">
-                  🔑 SUPER ADMIN
+                  SUPER ADMIN
                 </Badge>
                 <Button
                   variant="outline"
@@ -351,7 +371,7 @@ const Dashboard = () => {
                 <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-t-3xl">
                   <CardTitle className="text-2xl font-bold flex items-center">
                     <Sparkles className="h-6 w-6 mr-2" />
-                    🤖 Busca Inteligente de Vagas
+                    Busca Inteligente de Vagas
                   </CardTitle>
                   <CardDescription className="text-purple-100">
                     Busque as vagas mais recentes do LinkedIn e Google nas últimas 24h
@@ -365,11 +385,11 @@ const Dashboard = () => {
                       className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-2xl h-12 px-8 font-semibold text-lg"
                     >
                       {loadingLatestJobs ? (
-                        "🔍 Buscando vagas..."
+                        "Buscando vagas..."
                       ) : (
                         <>
                           <Sparkles className="w-5 h-5 mr-2" />
-                          🚀 Buscar Vagas Recentes
+                          Buscar Vagas Recentes
                         </>
                       )}
                     </Button>
@@ -398,7 +418,7 @@ const Dashboard = () => {
     );
   }
 
-  console.log('🏢 RENDERIZANDO PAINEL DE EMPRESA - USUÁRIO NÃO É ADMIN');
+  console.log('RENDERIZANDO PAINEL DE EMPRESA - USUÁRIO NÃO É ADMIN');
 
   if (loading && !company) {
     return (
@@ -411,11 +431,10 @@ const Dashboard = () => {
     );
   }
 
-  console.log('🏢 Renderizando painel de EMPRESA');
+  console.log('Renderizando painel de EMPRESA');
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50">
-      {/* Header Empresa */}
       <header className="bg-white/90 backdrop-blur-md shadow-lg border-b border-green-100 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">

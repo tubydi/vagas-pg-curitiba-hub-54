@@ -11,13 +11,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [validatingCnpj, setValidatingCnpj] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -43,36 +41,12 @@ const Auth = () => {
     }
   }, [user, navigate]);
 
-  const validateCnpj = async (cnpj: string) => {
-    try {
-      setValidatingCnpj(true);
-      
-      // Chamar edge function para validar CNPJ
-      const { data, error } = await supabase.functions.invoke('validate-cnpj', {
-        body: { cnpj: cnpj.replace(/\D/g, '') }
-      });
-
-      if (error) {
-        console.log('CNPJ validation error (continuing anyway):', error);
-        return { valid: true, message: 'Validação offline - prosseguindo' };
-      }
-
-      return data || { valid: true, message: 'CNPJ validado' };
-    } catch (error) {
-      console.log('CNPJ validation error (continuing anyway):', error);
-      return { valid: true, message: 'Validação offline - prosseguindo' };
-    } finally {
-      setValidatingCnpj(false);
-    }
-  };
-
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
     try {
       await signIn(email, password);
-      // O redirecionamento será feito automaticamente pelo AuthContext
     } catch (error) {
       console.error('Login error:', error);
     }
@@ -116,24 +90,10 @@ const Auth = () => {
         return;
       }
 
-      // Validar CNPJ (continua mesmo se falhar)
-      console.log('Validating CNPJ:', companyData.cnpj);
-      const cnpjValidation = await validateCnpj(companyData.cnpj);
-      
-      if (!cnpjValidation.valid) {
-        console.log('CNPJ validation failed, but continuing:', cnpjValidation.message);
-      }
-
       console.log('Creating user account with email:', companyData.email);
 
-      // Criar usuário no Supabase Auth com o EMAIL CORPORATIVO
-      // Agora passando dados com status 'Ativa' para ativação automática
-      const companyDataWithActiveStatus = {
-        ...companyData,
-        status: 'Ativa' // Definir empresa como ativa automaticamente
-      };
-
-      const result = await signUp(companyData.email, companyData.password, companyDataWithActiveStatus);
+      // Criar usuário no Supabase Auth apenas com email e senha
+      const result = await signUp(companyData.email, companyData.password);
       
       if (result.error) {
         console.error('Auth error:', result.error);
@@ -427,9 +387,9 @@ const Auth = () => {
                   <Button 
                     type="submit" 
                     className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl h-12 text-lg"
-                    disabled={loading || validatingCnpj}
+                    disabled={loading}
                   >
-                    {loading ? "Cadastrando..." : validatingCnpj ? "Validando CNPJ..." : "Cadastrar Empresa (Ativa Automaticamente)"}
+                    {loading ? "Cadastrando..." : "Cadastrar Empresa"}
                   </Button>
                 </form>
               </TabsContent>

@@ -32,45 +32,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   useEffect(() => {
-    // Configurar listener primeiro
+    let mounted = true;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
         
-        setSession(session);
-        setUser(session?.user || null);
-        
-        if (session?.user) {
-          await checkAdminStatus(session.user.id);
-        } else {
-          setIsAdmin(false);
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user || null);
+          
+          if (session?.user) {
+            await checkAdminStatus(session.user.id);
+          } else {
+            setIsAdmin(false);
+          }
+          
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
-    // Verificar sessão inicial
     const initializeAuth = async () => {
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         
-        setSession(initialSession);
-        setUser(initialSession?.user || null);
-        
-        if (initialSession?.user) {
-          await checkAdminStatus(initialSession.user.id);
+        if (mounted) {
+          setSession(initialSession);
+          setUser(initialSession?.user || null);
+          
+          if (initialSession?.user) {
+            await checkAdminStatus(initialSession.user.id);
+          }
+          
+          setLoading(false);
         }
       } catch (error) {
         console.error('Erro ao inicializar auth:', error);
-      } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
     initializeAuth();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const checkAdminStatus = async (userId: string) => {
@@ -152,25 +162,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      console.log('Fazendo logout...');
+      console.log('Iniciando logout...');
+      
+      // Limpar estados locais primeiro
+      setUser(null);
+      setSession(null);
+      setIsAdmin(false);
+      
+      // Fazer logout no Supabase
       const { error } = await supabase.auth.signOut();
       
       if (error) {
         console.error('Erro no logout:', error);
-        toast({
-          title: "Erro no logout",
-          description: error.message,
-          variant: "destructive",
-        });
       } else {
         console.log('Logout realizado com sucesso');
         toast({
           title: "Logout realizado",
           description: "Até logo!",
         });
+        
+        // Forçar redirecionamento
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 100);
       }
     } catch (error) {
       console.error('Erro inesperado no logout:', error);
+      // Mesmo com erro, limpar estados e redirecionar
+      setUser(null);
+      setSession(null);
+      setIsAdmin(false);
+      window.location.href = '/';
     }
   };
 

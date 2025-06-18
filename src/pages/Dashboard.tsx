@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -16,8 +17,6 @@ import {
   Trash2,
   AlertCircle,
   CheckCircle,
-  Clock,
-  CreditCard,
   LogOut
 } from "lucide-react";
 import EnhancedJobForm from "@/components/EnhancedJobForm";
@@ -37,11 +36,8 @@ const Dashboard = () => {
   const [loadingJobs, setLoadingJobs] = useState(true);
   const { toast } = useToast();
 
-  console.log('Dashboard - user:', user?.email, 'isAdmin:', false);
-
   useEffect(() => {
     if (user) {
-      console.log('Usuário no dashboard:', user.email);
       fetchCompanyAndJobs();
     }
   }, [user]);
@@ -50,8 +46,6 @@ const Dashboard = () => {
     if (!user) return;
     
     try {
-      console.log('Buscando empresa para user_id:', user.id);
-      
       // Buscar empresa do usuário
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
@@ -60,10 +54,7 @@ const Dashboard = () => {
         .single();
 
       if (companyError) {
-        console.error('Error fetching company:', companyError);
-        
         if (companyError.code === 'PGRST116') {
-          console.log('Empresa não encontrada - redirecionando para cadastro');
           toast({
             title: "Empresa não encontrada",
             description: "Complete seu cadastro criando uma nova conta.",
@@ -77,7 +68,6 @@ const Dashboard = () => {
         return;
       }
 
-      console.log('Empresa encontrada:', companyData);
       setCompany(companyData);
 
       // Buscar vagas da empresa
@@ -140,66 +130,6 @@ const Dashboard = () => {
       });
       fetchCompanyAndJobs();
     }
-  };
-
-  const getJobStatusInfo = (job: Job) => {
-    const paymentStatus = job.payment_status;
-    const jobStatus = job.status;
-
-    // Para empresa isenta (vagas@vagas.com)
-    if (company?.email === 'vagas@vagas.com') {
-      if (jobStatus === 'Ativa') {
-        return {
-          label: 'Ativa',
-          variant: 'default' as const,
-          icon: CheckCircle,
-          color: 'text-green-600'
-        };
-      }
-      return {
-        label: jobStatus || 'Inativa',
-        variant: 'secondary' as const,
-        icon: AlertCircle,
-        color: 'text-gray-600'
-      };
-    }
-
-    // Para empresas que precisam pagar
-    if (paymentStatus === 'pending') {
-      return {
-        label: 'Pagamento Pendente',
-        variant: 'destructive' as const,
-        icon: CreditCard,
-        color: 'text-red-600',
-        message: 'Realize o pagamento para ativar esta vaga'
-      };
-    }
-
-    if (paymentStatus === 'approved') {
-      if (jobStatus === 'Ativa') {
-        return {
-          label: 'Ativa',
-          variant: 'default' as const,
-          icon: CheckCircle,
-          color: 'text-green-600'
-        };
-      } else {
-        return {
-          label: 'Aguardando Aprovação',
-          variant: 'secondary' as const,
-          icon: Clock,
-          color: 'text-orange-600',
-          message: 'Vaga paga, aguardando aprovação do administrador. Contato: pontagrossavagas@gmail.com'
-        };
-      }
-    }
-
-    return {
-      label: 'Inativa',
-      variant: 'secondary' as const,
-      icon: AlertCircle,
-      color: 'text-gray-600'
-    };
   };
 
   if (loading) {
@@ -470,69 +400,56 @@ const Dashboard = () => {
               </Card>
             ) : (
               <div className="grid grid-cols-1 gap-6">
-                {jobs.map((job) => {
-                  const statusInfo = getJobStatusInfo(job);
-                  const StatusIcon = statusInfo.icon;
-                  
-                  return (
-                    <Card key={job.id} className="hover:shadow-lg transition-shadow">
-                      <CardContent className="p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <h3 className="text-xl font-semibold text-gray-900">
-                                {job.title}
-                              </h3>
-                              <Badge variant={statusInfo.variant}>
-                                <StatusIcon className={`w-3 h-3 mr-1 ${statusInfo.color}`} />
-                                {statusInfo.label}
-                              </Badge>
-                            </div>
-                            <p className="text-gray-600 mb-2">{job.salary} • {job.location}</p>
-                            <div className="flex items-center space-x-4 text-sm text-gray-500">
-                              <span>{job.contract_type}</span>
-                              <span>{job.work_mode}</span>
-                              <span>{job.experience_level}</span>
-                            </div>
-                            {statusInfo.message && (
-                              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                <p className="text-sm text-yellow-800">
-                                  <AlertCircle className="w-4 h-4 inline mr-1" />
-                                  {statusInfo.message}
-                                </p>
-                              </div>
-                            )}
+                {jobs.map((job) => (
+                  <Card key={job.id} className="hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <h3 className="text-xl font-semibold text-gray-900">
+                              {job.title}
+                            </h3>
+                            <Badge variant={job.status === 'Ativa' ? 'default' : 'secondary'}>
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              {job.status}
+                            </Badge>
                           </div>
-                          <div className="flex space-x-2 ml-4">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEditJob(job)}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setActiveTab("candidates")}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteJob(job.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                          <p className="text-gray-600 mb-2">{job.salary} • {job.location}</p>
+                          <div className="flex items-center space-x-4 text-sm text-gray-500">
+                            <span>{job.contract_type}</span>
+                            <span>{job.work_mode}</span>
+                            <span>{job.experience_level}</span>
                           </div>
                         </div>
-                        <p className="text-gray-700 line-clamp-2">{job.description}</p>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                        <div className="flex space-x-2 ml-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditJob(job)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setActiveTab("candidates")}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteJob(job.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-gray-700 line-clamp-2">{job.description}</p>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
           </div>

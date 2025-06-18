@@ -12,7 +12,6 @@ import { X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/integrations/supabase/types";
-import PaymentModal from "./PaymentModal";
 
 type ContractType = Database["public"]["Enums"]["contract_type"];
 type WorkMode = Database["public"]["Enums"]["work_mode"];
@@ -44,12 +43,8 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
 
   const [benefitsList, setBenefitsList] = useState<string[]>([]);
   const [newBenefit, setNewBenefit] = useState("");
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [companyEmail, setCompanyEmail] = useState("");
 
   useEffect(() => {
-    console.log('JobForm mounted with companyId:', companyId);
-    
     if (job) {
       setFormData({
         title: job.title || "",
@@ -66,96 +61,7 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
       });
       setBenefitsList(job.benefits || []);
     }
-
-    // Buscar email da empresa
-    const fetchCompanyEmail = async () => {
-      if (!companyId || companyId.trim() === '') {
-        console.error('CompanyId is missing');
-        return;
-      }
-      
-      console.log('Buscando email da empresa com ID:', companyId);
-      
-      const { data, error } = await supabase
-        .from('companies')
-        .select('email')
-        .eq('id', companyId)
-        .single();
-      
-      if (error) {
-        console.error('Error fetching company email:', error);
-        return;
-      }
-      
-      if (data) {
-        console.log('Company email found:', data.email);
-        setCompanyEmail(data.email);
-      }
-    };
-    
-    if (companyId && companyId.trim() !== '') {
-      fetchCompanyEmail();
-    }
   }, [job, companyId]);
-
-  const createPayment = async () => {
-    console.log('Creating payment with companyId:', companyId);
-    
-    if (!companyId || companyId.trim() === '') {
-      throw new Error('Company ID is missing');
-    }
-
-    // Verificar se todos os campos obrigatórios estão preenchidos
-    if (!formData.title || !formData.description || !formData.requirements || 
-        !formData.salary || !formData.location || !formData.contract_type || 
-        !formData.work_mode || !formData.experience_level) {
-      throw new Error('Todos os campos obrigatórios devem ser preenchidos');
-    }
-
-    const jobDataToSend = {
-      title: formData.title,
-      description: formData.description,
-      requirements: formData.requirements,
-      salary: formData.salary,
-      location: formData.location,
-      contract_type: formData.contract_type,
-      work_mode: formData.work_mode,
-      experience_level: formData.experience_level,
-      benefits: benefitsList,
-      has_external_application: formData.has_external_application,
-      application_method: formData.application_method,
-      contact_info: formData.contact_info
-    };
-
-    console.log('Enviando dados para create-payment:', {
-      jobData: jobDataToSend,
-      companyId: companyId
-    });
-
-    const { data, error } = await supabase.functions.invoke('create-payment', {
-      body: {
-        jobData: jobDataToSend,
-        companyId: companyId
-      }
-    });
-
-    if (error) {
-      console.error('Error in create-payment function:', error);
-      throw error;
-    }
-    
-    console.log('create-payment response:', data);
-    return data;
-  };
-
-  const handlePaymentComplete = (jobId: string) => {
-    setShowPaymentModal(false);
-    toast({
-      title: "✅ Vaga Publicada!",
-      description: "Sua vaga foi publicada com sucesso e estará visível em breve.",
-    });
-    onSave();
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,17 +78,17 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
       return;
     }
 
-    if (job?.id) {
-      // Atualizar vaga existente
-      setLoading(true);
-      try {
-        const jobData = {
-          ...formData,
-          benefits: benefitsList,
-          company_id: companyId,
-          status: 'Ativa' as const
-        };
+    setLoading(true);
+    try {
+      const jobData = {
+        ...formData,
+        benefits: benefitsList,
+        company_id: companyId,
+        status: 'Ativa' as const // Sempre ativa, sem pagamento
+      };
 
+      if (job?.id) {
+        // Atualizar vaga existente
         const { error } = await supabase
           .from('jobs')
           .update(jobData)
@@ -194,31 +100,30 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
           title: "Vaga atualizada",
           description: "A vaga foi atualizada com sucesso!",
         });
+      } else {
+        // Nova vaga - criar diretamente
+        const { error } = await supabase
+          .from('jobs')
+          .insert([jobData]);
 
-        onSave();
-      } catch (error) {
-        console.error('Error updating job:', error);
+        if (error) throw error;
+
         toast({
-          title: "Erro",
-          description: "Erro ao atualizar vaga. Tente novamente.",
-          variant: "destructive",
+          title: "✅ Vaga Publicada!",
+          description: "Sua vaga foi publicada gratuitamente e já está ativa!",
         });
-      } finally {
-        setLoading(false);
       }
-    } else {
-      // Nova vaga - verificar se companyId existe antes de mostrar modal
-      if (!companyId || companyId.trim() === '') {
-        toast({
-          title: "Erro",
-          description: "ID da empresa não encontrado. Tente fazer login novamente.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      console.log('Opening payment modal for new job with companyId:', companyId);
-      setShowPaymentModal(true);
+
+      onSave();
+    } catch (error) {
+      console.error('Error saving job:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar vaga. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -238,252 +143,239 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
   };
 
   return (
-    <>
-      <Card className="border-0 rounded-3xl shadow-2xl">
-        <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-3xl">
-          <CardTitle className="text-2xl font-bold text-center">
-            {job ? "Editar Vaga" : "Nova Vaga"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-8">
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Informações Básicas */}
-            <div className="space-y-6">
-              <h4 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">Informações Básicas</h4>
-              
+    <Card className="border-0 rounded-3xl shadow-2xl">
+      <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-3xl">
+        <CardTitle className="text-2xl font-bold text-center">
+          {job ? "Editar Vaga" : "Nova Vaga"}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-8">
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Informações Básicas */}
+          <div className="space-y-6">
+            <h4 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">Informações Básicas</h4>
+            
+            <div>
+              <Label htmlFor="title" className="text-base font-semibold">Título da Vaga *</Label>
+              <Input
+                id="title"
+                value={formData.title}
+                onChange={(e) => handleInputChange("title", e.target.value)}
+                required
+                placeholder="Ex: Desenvolvedor Full Stack"
+                className="mt-2 h-12 rounded-xl"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="description" className="text-base font-semibold">Descrição da Vaga *</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => handleInputChange("description", e.target.value)}
+                required
+                placeholder="Descreva as principais responsabilidades e atividades..."
+                className="mt-2 h-32 rounded-xl"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="requirements" className="text-base font-semibold">Requisitos *</Label>
+              <Textarea
+                id="requirements"
+                value={formData.requirements}
+                onChange={(e) => handleInputChange("requirements", e.target.value)}
+                required
+                placeholder="Liste os requisitos técnicos e experiências necessárias..."
+                className="mt-2 h-24 rounded-xl"
+              />
+            </div>
+          </div>
+
+          {/* Condições */}
+          <div className="space-y-6">
+            <h4 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">Condições da Vaga</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <Label htmlFor="title" className="text-base font-semibold">Título da Vaga *</Label>
+                <Label htmlFor="salary" className="text-base font-semibold">Faixa Salarial *</Label>
                 <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => handleInputChange("title", e.target.value)}
+                  id="salary"
+                  value={formData.salary}
+                  onChange={(e) => handleInputChange("salary", e.target.value)}
                   required
-                  placeholder="Ex: Desenvolvedor Full Stack"
+                  placeholder="Ex: R$ 5.000 - R$ 8.000"
                   className="mt-2 h-12 rounded-xl"
                 />
               </div>
 
               <div>
-                <Label htmlFor="description" className="text-base font-semibold">Descrição da Vaga *</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange("description", e.target.value)}
-                  required
-                  placeholder="Descreva as principais responsabilidades e atividades..."
-                  className="mt-2 h-32 rounded-xl"
-                />
+                <Label htmlFor="location" className="text-base font-semibold">Local *</Label>
+                <Select value={formData.location} onValueChange={(value) => handleInputChange("location", value)}>
+                  <SelectTrigger className="mt-2 h-12 rounded-xl">
+                    <SelectValue placeholder="Selecione a cidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Ponta Grossa">Ponta Grossa</SelectItem>
+                    <SelectItem value="Curitiba">Curitiba</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <Label htmlFor="contract_type" className="text-base font-semibold">Tipo de Contrato *</Label>
+                <Select value={formData.contract_type} onValueChange={(value) => handleInputChange("contract_type", value)}>
+                  <SelectTrigger className="mt-2 h-12 rounded-xl">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CLT">CLT</SelectItem>
+                    <SelectItem value="PJ">PJ</SelectItem>
+                    <SelectItem value="Freelancer">Freelancer</SelectItem>
+                    <SelectItem value="Estágio">Estágio</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
-                <Label htmlFor="requirements" className="text-base font-semibold">Requisitos *</Label>
-                <Textarea
-                  id="requirements"
-                  value={formData.requirements}
-                  onChange={(e) => handleInputChange("requirements", e.target.value)}
-                  required
-                  placeholder="Liste os requisitos técnicos e experiências necessárias..."
-                  className="mt-2 h-24 rounded-xl"
-                />
+                <Label htmlFor="work_mode" className="text-base font-semibold">Modalidade *</Label>
+                <Select value={formData.work_mode} onValueChange={(value) => handleInputChange("work_mode", value)}>
+                  <SelectTrigger className="mt-2 h-12 rounded-xl">
+                    <SelectValue placeholder="Modalidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Presencial">Presencial</SelectItem>
+                    <SelectItem value="Remoto">Remoto</SelectItem>
+                    <SelectItem value="Híbrido">Híbrido</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="experience_level" className="text-base font-semibold">Experiência *</Label>
+                <Select value={formData.experience_level} onValueChange={(value) => handleInputChange("experience_level", value)}>
+                  <SelectTrigger className="mt-2 h-12 rounded-xl">
+                    <SelectValue placeholder="Nível" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Estagiário">Estagiário</SelectItem>
+                    <SelectItem value="Júnior">Júnior</SelectItem>
+                    <SelectItem value="Pleno">Pleno</SelectItem>
+                    <SelectItem value="Sênior">Sênior</SelectItem>
+                    <SelectItem value="Especialista">Especialista</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+          </div>
 
-            {/* Condições */}
-            <div className="space-y-6">
-              <h4 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">Condições da Vaga</h4>
-              
+          {/* Candidatura Externa */}
+          <div className="space-y-6">
+            <h4 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">Candidatura Externa</h4>
+            
+            <div className="flex items-center space-x-3">
+              <Switch
+                id="has_external_application"
+                checked={formData.has_external_application}
+                onCheckedChange={(checked) => handleInputChange("has_external_application", checked)}
+              />
+              <Label htmlFor="has_external_application" className="text-base font-semibold">
+                Permitir candidatura direta com a empresa
+              </Label>
+            </div>
+
+            {formData.has_external_application && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label htmlFor="salary" className="text-base font-semibold">Faixa Salarial *</Label>
+                  <Label htmlFor="application_method" className="text-base font-semibold">Método de Candidatura</Label>
+                  <Select value={formData.application_method} onValueChange={(value) => handleInputChange("application_method", value)}>
+                    <SelectTrigger className="mt-2 h-12 rounded-xl">
+                      <SelectValue placeholder="Selecione o método" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                      <SelectItem value="Email">Email</SelectItem>
+                      <SelectItem value="Telefone">Telefone</SelectItem>
+                      <SelectItem value="Presencial">Presencial</SelectItem>
+                      <SelectItem value="Site">Site</SelectItem>
+                      <SelectItem value="Outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="contact_info" className="text-base font-semibold">Informação de Contato</Label>
                   <Input
-                    id="salary"
-                    value={formData.salary}
-                    onChange={(e) => handleInputChange("salary", e.target.value)}
-                    required
-                    placeholder="Ex: R$ 5.000 - R$ 8.000"
+                    id="contact_info"
+                    value={formData.contact_info}
+                    onChange={(e) => handleInputChange("contact_info", e.target.value)}
+                    placeholder="Ex: (42) 9999-9999 ou email@empresa.com"
                     className="mt-2 h-12 rounded-xl"
                   />
                 </div>
-
-                <div>
-                  <Label htmlFor="location" className="text-base font-semibold">Local *</Label>
-                  <Select value={formData.location} onValueChange={(value) => handleInputChange("location", value)}>
-                    <SelectTrigger className="mt-2 h-12 rounded-xl">
-                      <SelectValue placeholder="Selecione a cidade" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Ponta Grossa">Ponta Grossa</SelectItem>
-                      <SelectItem value="Curitiba">Curitiba</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
+            )}
+          </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <Label htmlFor="contract_type" className="text-base font-semibold">Tipo de Contrato *</Label>
-                  <Select value={formData.contract_type} onValueChange={(value) => handleInputChange("contract_type", value)}>
-                    <SelectTrigger className="mt-2 h-12 rounded-xl">
-                      <SelectValue placeholder="Tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CLT">CLT</SelectItem>
-                      <SelectItem value="PJ">PJ</SelectItem>
-                      <SelectItem value="Freelancer">Freelancer</SelectItem>
-                      <SelectItem value="Estágio">Estágio</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="work_mode" className="text-base font-semibold">Modalidade *</Label>
-                  <Select value={formData.work_mode} onValueChange={(value) => handleInputChange("work_mode", value)}>
-                    <SelectTrigger className="mt-2 h-12 rounded-xl">
-                      <SelectValue placeholder="Modalidade" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Presencial">Presencial</SelectItem>
-                      <SelectItem value="Remoto">Remoto</SelectItem>
-                      <SelectItem value="Híbrido">Híbrido</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="experience_level" className="text-base font-semibold">Experiência *</Label>
-                  <Select value={formData.experience_level} onValueChange={(value) => handleInputChange("experience_level", value)}>
-                    <SelectTrigger className="mt-2 h-12 rounded-xl">
-                      <SelectValue placeholder="Nível" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Estagiário">Estagiário</SelectItem>
-                      <SelectItem value="Júnior">Júnior</SelectItem>
-                      <SelectItem value="Pleno">Pleno</SelectItem>
-                      <SelectItem value="Sênior">Sênior</SelectItem>
-                      <SelectItem value="Especialista">Especialista</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            {/* Candidatura Externa */}
-            <div className="space-y-6">
-              <h4 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">Candidatura Externa</h4>
-              
-              <div className="flex items-center space-x-3">
-                <Switch
-                  id="has_external_application"
-                  checked={formData.has_external_application}
-                  onCheckedChange={(checked) => handleInputChange("has_external_application", checked)}
-                />
-                <Label htmlFor="has_external_application" className="text-base font-semibold">
-                  Permitir candidatura direta com a empresa
-                </Label>
-              </div>
-
-              {formData.has_external_application && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <Label htmlFor="application_method" className="text-base font-semibold">Método de Candidatura</Label>
-                    <Select value={formData.application_method} onValueChange={(value) => handleInputChange("application_method", value)}>
-                      <SelectTrigger className="mt-2 h-12 rounded-xl">
-                        <SelectValue placeholder="Selecione o método" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="WhatsApp">WhatsApp</SelectItem>
-                        <SelectItem value="Email">Email</SelectItem>
-                        <SelectItem value="Telefone">Telefone</SelectItem>
-                        <SelectItem value="Presencial">Presencial</SelectItem>
-                        <SelectItem value="Site">Site</SelectItem>
-                        <SelectItem value="Outro">Outro</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="contact_info" className="text-base font-semibold">Informação de Contato</Label>
-                    <Input
-                      id="contact_info"
-                      value={formData.contact_info}
-                      onChange={(e) => handleInputChange("contact_info", e.target.value)}
-                      placeholder="Ex: (42) 9999-9999 ou email@empresa.com"
-                      className="mt-2 h-12 rounded-xl"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Benefícios */}
-            <div className="space-y-6">
-              <h4 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">Benefícios</h4>
-              
-              <div className="flex gap-3">
-                <Input
-                  value={newBenefit}
-                  onChange={(e) => setNewBenefit(e.target.value)}
-                  placeholder="Ex: Vale refeição, Plano de saúde..."
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addBenefit())}
-                  className="h-12 rounded-xl"
-                />
-                <Button type="button" onClick={addBenefit} variant="outline" className="rounded-xl px-6">
-                  Adicionar
-                </Button>
-              </div>
-
-              {benefitsList.length > 0 && (
-                <Card className="rounded-2xl border-green-100">
-                  <CardContent className="p-6">
-                    <div className="flex flex-wrap gap-3">
-                      {benefitsList.map((benefit, index) => (
-                        <Badge key={index} variant="secondary" className="flex items-center gap-2 bg-green-100 text-green-800 hover:bg-green-200 rounded-full px-3 py-1">
-                          {benefit}
-                          <X 
-                            className="w-4 h-4 cursor-pointer hover:text-red-500" 
-                            onClick={() => removeBenefit(benefit)}
-                          />
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-4 pt-6">
-              <Button 
-                type="submit" 
-                disabled={loading}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white flex-1 h-12 rounded-2xl font-semibold text-lg"
-              >
-                {loading ? "Salvando..." : (job ? "Atualizar Vaga" : "Publicar Vaga")}
-              </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onCancel} 
-                className="flex-1 h-12 rounded-2xl font-semibold"
-              >
-                Cancelar
+          {/* Benefícios */}
+          <div className="space-y-6">
+            <h4 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">Benefícios</h4>
+            
+            <div className="flex gap-3">
+              <Input
+                value={newBenefit}
+                onChange={(e) => setNewBenefit(e.target.value)}
+                placeholder="Ex: Vale refeição, Plano de saúde..."
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addBenefit())}
+                className="h-12 rounded-xl"
+              />
+              <Button type="button" onClick={addBenefit} variant="outline" className="rounded-xl px-6">
+                Adicionar
               </Button>
             </div>
-          </form>
-        </CardContent>
-      </Card>
 
-      {/* Modal de Pagamento */}
-      {showPaymentModal && (
-        <PaymentModal
-          jobTitle={formData.title}
-          companyEmail={companyEmail}
-          onClose={() => setShowPaymentModal(false)}
-          onPaymentComplete={handlePaymentComplete}
-          createPaymentFn={createPayment}
-        />
-      )}
-    </>
+            {benefitsList.length > 0 && (
+              <Card className="rounded-2xl border-green-100">
+                <CardContent className="p-6">
+                  <div className="flex flex-wrap gap-3">
+                    {benefitsList.map((benefit, index) => (
+                      <Badge key={index} variant="secondary" className="flex items-center gap-2 bg-green-100 text-green-800 hover:bg-green-200 rounded-full px-3 py-1">
+                        {benefit}
+                        <X 
+                          className="w-4 h-4 cursor-pointer hover:text-red-500" 
+                          onClick={() => removeBenefit(benefit)}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-4 pt-6">
+            <Button 
+              type="submit" 
+              disabled={loading}
+              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white flex-1 h-12 rounded-2xl font-semibold text-lg"
+            >
+              {loading ? "Salvando..." : (job ? "Atualizar Vaga" : "Publicar Vaga Gratuitamente")}
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onCancel} 
+              className="flex-1 h-12 rounded-2xl font-semibold"
+            >
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 };
 

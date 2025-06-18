@@ -59,76 +59,104 @@ const JobList = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // BUSCA AUTOMÁTICA APRIMORADA - SEM BOTÃO RECARREGAR
   const fetchJobs = async () => {
     try {
-      console.log('Executando busca de todas as vagas...');
+      console.log('🔍 Executando busca AUTOMÁTICA APRIMORADA de vagas...');
       setLoading(true);
       
-      // Buscar todas as vagas ativas
-      const { data: jobsData, error: jobsError } = await supabase
+      // Primeira tentativa - busca completa com JOIN
+      const { data, error } = await supabase
         .from('jobs')
-        .select('*')
+        .select(`
+          *,
+          companies!inner (
+            id,
+            name,
+            city,
+            sector,
+            email,
+            phone
+          )
+        `)
         .eq('status', 'Ativa')
         .order('created_at', { ascending: false });
 
-      if (jobsError) {
-        console.error('Erro ao buscar vagas:', jobsError);
-        toast({
-          title: "Erro ao carregar vagas",
-          description: "Não foi possível carregar as vagas. Tente novamente.",
-          variant: "destructive",
-        });
+      if (error) {
+        console.error('❌ Erro na busca principal:', error);
+        
+        // TENTATIVA ALTERNATIVA - busca separada
+        console.log('🔄 Executando busca alternativa...');
+        const { data: jobsData, error: jobsError } = await supabase
+          .from('jobs')
+          .select('*')
+          .eq('status', 'Ativa')
+          .order('created_at', { ascending: false });
+
+        if (jobsError) {
+          console.error('❌ Erro na busca alternativa:', jobsError);
+          toast({
+            title: "Erro ao carregar vagas",
+            description: "Não foi possível carregar as vagas. Tente novamente.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (jobsData && jobsData.length > 0) {
+          // Buscar dados das empresas separadamente
+          const companyIds = [...new Set(jobsData.map(job => job.company_id))];
+          const { data: companiesData } = await supabase
+            .from('companies')
+            .select('id, name, city, sector, email, phone')
+            .in('id', companyIds);
+
+          // Mapear vagas com dados das empresas
+          const jobsWithCompanies = jobsData.map(job => ({
+            ...job,
+            has_external_application: job.has_external_application || false,
+            application_method: job.application_method || null,
+            contact_info: job.contact_info || null,
+            companies: companiesData?.find(c => c.id === job.company_id) || {
+              id: job.company_id,
+              name: 'Empresa não encontrada',
+              city: 'N/A',
+              sector: 'N/A'
+            }
+          }));
+
+          console.log('✅ Busca alternativa funcionou:', jobsWithCompanies.length, 'vagas');
+          setJobs(jobsWithCompanies);
+        }
         return;
       }
 
-      console.log('Vagas encontradas:', jobsData?.length || 0);
-      console.log('Dados das vagas:', jobsData);
-
-      if (jobsData && jobsData.length > 0) {
-        // Buscar dados das empresas
-        const companyIds = [...new Set(jobsData.map(job => job.company_id))];
-        console.log('IDs das empresas:', companyIds);
-        
-        const { data: companiesData, error: companiesError } = await supabase
-          .from('companies')
-          .select('id, name, city, sector, email, phone')
-          .in('id', companyIds);
-
-        if (companiesError) {
-          console.error('Erro ao buscar empresas:', companiesError);
-        }
-
-        console.log('Empresas encontradas:', companiesData?.length || 0);
-
-        // Combinar dados
-        const jobsWithCompanies = jobsData.map(job => ({
+      console.log('✅ Vagas encontradas:', data?.length || 0, 'vagas');
+      console.log('📋 Dados das vagas:', data);
+      
+      if (data && data.length > 0) {
+        const mappedJobs = data.map(job => ({
           ...job,
           has_external_application: job.has_external_application || false,
           application_method: job.application_method || null,
-          contact_info: job.contact_info || null,
-          companies: companiesData?.find(c => c.id === job.company_id) || {
-            id: job.company_id,
-            name: 'Empresa não encontrada',
-            city: 'N/A',
-            sector: 'N/A'
-          }
+          contact_info: job.contact_info || null
         }));
-
-        console.log('Vagas com empresas configuradas:', jobsWithCompanies.length);
-        setJobs(jobsWithCompanies);
-      } else {
-        console.log('Nenhuma vaga ativa encontrada');
         
-        // Verificar total de vagas
+        setJobs(mappedJobs);
+        console.log('🎯 Total de vagas configuradas:', mappedJobs.length);
+      } else {
+        console.log('⚠️ Nenhuma vaga ativa encontrada');
+        
+        // Verificação adicional - contar total de vagas
         const { count } = await supabase
           .from('jobs')
           .select('*', { count: 'exact', head: true });
           
-        console.log('Total de vagas no banco (todas):', count);
+        console.log('📊 Total de vagas no banco (todas):', count);
       }
       
     } catch (error) {
-      console.error('Erro inesperado ao buscar vagas:', error);
+      console.error('❌ Erro inesperado ao buscar vagas:', error);
       toast({
         title: "Erro inesperado",
         description: "Ocorreu um erro inesperado. Tente recarregar a página.",
@@ -139,12 +167,14 @@ const JobList = () => {
     }
   };
 
+  // BUSCA AUTOMÁTICA - executar ao carregar e a cada 30 segundos
   useEffect(() => {
-    console.log('Iniciando busca de vagas...');
+    console.log('🔄 Iniciando busca automática de vagas...');
     fetchJobs();
     
+    // Busca automática a cada 30 segundos
     const interval = setInterval(() => {
-      console.log('Executando busca automática periódica');
+      console.log('🔄 Executando busca automática periódica');
       fetchJobs();
     }, 30000);
 
@@ -174,7 +204,7 @@ const JobList = () => {
       window.open(phoneUrl, '_blank');
     } else {
       toast({
-        title: "Informações de Contato",
+        title: "📞 Informações de Contato",
         description: `${application_method}: ${contact_info}`,
       });
     }
@@ -213,7 +243,7 @@ const JobList = () => {
         <div className="max-w-6xl mx-auto">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Buscando vagas...</p>
+            <p className="mt-4 text-gray-600">🔍 Buscando vagas automaticamente...</p>
           </div>
         </div>
       </div>
@@ -223,15 +253,17 @@ const JobList = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
+        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent mb-4">
             Todas as Vagas
           </h1>
           <p className="text-lg md:text-xl text-gray-600">
-            {jobs.length} vagas disponíveis
+            Vagas atualizadas automaticamente - {jobs.length} disponíveis
           </p>
         </div>
 
+        {/* Filters */}
         <Card className="mb-8 border-0 shadow-lg rounded-3xl">
           <CardContent className="p-4 md:p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -273,32 +305,33 @@ const JobList = () => {
           </CardContent>
         </Card>
 
+        {/* Results */}
         <div className="mb-6 text-center md:text-left">
           <p className="text-gray-600">
             {filteredJobs.length} vaga{filteredJobs.length !== 1 ? 's' : ''} encontrada{filteredJobs.length !== 1 ? 's' : ''}
           </p>
         </div>
 
+        {/* Jobs Grid */}
         {filteredJobs.length === 0 ? (
           <Card className="border-0 shadow-lg rounded-3xl">
             <CardContent className="p-8 md:p-12 text-center">
               <Building2 className="h-12 md:h-16 w-12 md:w-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl md:text-2xl font-bold text-gray-700 mb-2">
-                {jobs.length === 0 ? "Buscando vagas..." : "Nenhuma vaga encontrada"}
+                {jobs.length === 0 ? "Sistema buscando vagas..." : "Nenhuma vaga encontrada"}
               </h3>
-              <p className="text-gray-500 mb-6">
+              <p className="text-gray-500">
                 {jobs.length === 0 
-                  ? "O sistema está buscando vagas. Aguarde alguns instantes." 
-                  : "Tente ajustar os filtros de busca ou aguarde novas vagas serem adicionadas."
+                  ? "O sistema está executando busca automática de vagas. Aguarde alguns instantes." 
+                  : "Tente ajustar os filtros de busca ou aguarde novas vagas serem adicionadas automaticamente."
                 }
               </p>
               {jobs.length === 0 && (
                 <Button 
                   onClick={fetchJobs}
-                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl"
+                  className="mt-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl"
                 >
-                  <Search className="w-4 h-4 mr-2" />
-                  Buscar Novamente
+                  🔍 Buscar Novamente
                 </Button>
               )}
             </CardContent>
@@ -368,26 +401,29 @@ const JobList = () => {
                     )}
                   </div>
                   
+                  {/* Botões de Candidatura */}
                   <div className="mt-6 space-y-3">
+                    {/* Candidatura pelo site (sempre disponível) */}
                     <Button 
                       onClick={() => handleApplyJob(job)}
                       className="w-full h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-semibold text-base md:text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
                     >
-                      Candidatar-se pelo Site
+                      🌐 Candidatar-se pelo Site
                     </Button>
 
+                    {/* Candidatura direta (se disponível) */}
                     {job.has_external_application && job.application_method && job.contact_info && (
                       <Button 
                         onClick={() => handleDirectApplication(job)}
                         variant="outline"
                         className="w-full h-12 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 rounded-2xl font-semibold text-base md:text-lg transition-all duration-200"
                       >
-                        {job.application_method === 'WhatsApp' && 'WhatsApp: '}
-                        {job.application_method === 'Email' && 'Email: '}
-                        {job.application_method === 'Telefone' && 'Telefone: '}
-                        {job.application_method === 'Presencial' && 'Presencial: '}
-                        {job.application_method === 'Site' && 'Site: '}
-                        {job.application_method === 'Outro' && 'Outro: '}
+                        {job.application_method === 'WhatsApp' && '📱 '}
+                        {job.application_method === 'Email' && '📧 '}
+                        {job.application_method === 'Telefone' && '📞 '}
+                        {job.application_method === 'Presencial' && '🏢 '}
+                        {job.application_method === 'Site' && '🌐 '}
+                        {job.application_method === 'Outro' && '🔗 '}
                         Candidatar-se via {job.application_method}
                       </Button>
                     )}
@@ -398,6 +434,7 @@ const JobList = () => {
           </div>
         )}
 
+        {/* Application Form Modal */}
         {selectedJob && isApplicationFormOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">

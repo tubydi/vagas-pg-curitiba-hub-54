@@ -565,7 +565,7 @@ const Dashboard = () => {
         {activeTab === "candidates" && (
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Candidatos</h2>
-            <CandidatesList companyId={company.id} />
+            <CandidatesList />
           </div>
         )}
       </div>

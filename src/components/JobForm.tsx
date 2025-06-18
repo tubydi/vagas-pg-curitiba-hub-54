@@ -105,20 +105,36 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
       throw new Error('Company ID is missing');
     }
 
+    // Verificar se todos os campos obrigatórios estão preenchidos
+    if (!formData.title || !formData.description || !formData.requirements || 
+        !formData.salary || !formData.location || !formData.contract_type || 
+        !formData.work_mode || !formData.experience_level) {
+      throw new Error('Todos os campos obrigatórios devem ser preenchidos');
+    }
+
+    const jobDataToSend = {
+      title: formData.title,
+      description: formData.description,
+      requirements: formData.requirements,
+      salary: formData.salary,
+      location: formData.location,
+      contract_type: formData.contract_type,
+      work_mode: formData.work_mode,
+      experience_level: formData.experience_level,
+      benefits: benefitsList,
+      has_external_application: formData.has_external_application,
+      application_method: formData.application_method,
+      contact_info: formData.contact_info
+    };
+
     console.log('Enviando dados para create-payment:', {
-      jobData: {
-        ...formData,
-        benefits: benefitsList
-      },
+      jobData: jobDataToSend,
       companyId: companyId
     });
 
     const { data, error } = await supabase.functions.invoke('create-payment', {
       body: {
-        jobData: {
-          ...formData,
-          benefits: benefitsList
-        },
+        jobData: jobDataToSend,
         companyId: companyId
       }
     });
@@ -143,6 +159,18 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validar campos obrigatórios
+    if (!formData.title || !formData.description || !formData.requirements || 
+        !formData.salary || !formData.location || !formData.contract_type || 
+        !formData.work_mode || !formData.experience_level) {
+      toast({
+        title: "Erro",
+        description: "Todos os campos obrigatórios devem ser preenchidos.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (job?.id) {
       // Atualizar vaga existente

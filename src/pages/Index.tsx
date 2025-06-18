@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +34,9 @@ interface Job {
   benefits: string[] | null;
   company_id: string;
   companies: Company;
+  has_external_application?: boolean;
+  application_method?: string;
+  contact_info?: string;
 }
 
 const Index = () => {
@@ -90,6 +94,9 @@ const Index = () => {
           
         const jobsWithCompanies = jobsData.map(job => ({
           ...job,
+          has_external_application: job.has_external_application || false,
+          application_method: job.application_method || null,
+          contact_info: job.contact_info || null,
           companies: companiesData?.find(c => c.id === job.company_id) || {
             id: job.company_id,
             name: 'Empresa não encontrada',

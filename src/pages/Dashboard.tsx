@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -57,52 +58,30 @@ const Dashboard = () => {
     try {
       setLoadingCompany(true);
       
-      // Buscar empresa do usuário com retry
-      let companyData = null;
-      let attempts = 0;
-      const maxAttempts = 3;
-      
-      while (!companyData && attempts < maxAttempts) {
-        attempts++;
-        console.log(`Dashboard: Tentativa ${attempts} de buscar empresa...`);
-        
-        const { data, error } = await supabase
-          .from('companies')
-          .select('*')
-          .eq('user_id', user.id);
+      // Buscar empresa do usuário
+      const { data: companyData, error: companyError } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-        if (error) {
-          console.error('Erro ao buscar empresa:', error);
-          if (attempts === maxAttempts) {
-            throw error;
-          }
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
-          continue;
+      if (companyError) {
+        console.error('Erro ao buscar empresa:', companyError);
+        if (companyError.code === 'PGRST116') {
+          console.log('Dashboard: Empresa não encontrada para este usuário');
+          toast({
+            title: "Empresa não encontrada",
+            description: "Sua empresa não foi encontrada. Faça logout e cadastre-se novamente.",
+            variant: "destructive",
+          });
         }
-
-        if (data && data.length > 0) {
-          companyData = data[0];
-          console.log('Dashboard: Empresa encontrada:', companyData);
-        } else if (attempts < maxAttempts) {
-          console.log('Dashboard: Empresa não encontrada, aguardando...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      }
-
-      if (!companyData) {
-        console.log('Dashboard: Empresa não encontrada após tentativas');
-        toast({
-          title: "Empresa não encontrada",
-          description: "Parece que sua empresa ainda não foi criada. Faça logout e cadastre-se novamente.",
-          variant: "destructive",
-        });
         setLoadingCompany(false);
         setLoadingJobs(false);
         return;
       }
 
+      console.log('Dashboard: Empresa encontrada:', companyData);
       setCompany(companyData);
-      console.log('Dashboard: Empresa definida, buscando vagas...');
 
       // Buscar vagas da empresa
       setLoadingJobs(true);

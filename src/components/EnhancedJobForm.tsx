@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,7 +124,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         ...formData,
         benefits: benefitsList,
         company_id: companyId,
-        status: 'Ativa' as const // Sempre ativa inicialmente
+        status: 'Ativa' as const // Sempre ativa inicialmente - status válido do enum
       };
 
       console.log('Dados da vaga a serem inseridos:', jobData);

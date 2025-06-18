@@ -35,44 +35,77 @@ const Dashboard = () => {
   const [company, setCompany] = useState<Company | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [loadingJobs, setLoadingJobs] = useState(true);
+  const [loadingCompany, setLoadingCompany] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
+      console.log('Dashboard: Usuário logado, buscando dados...', user.email);
       fetchCompanyAndJobs();
     }
   }, [user]);
 
   const fetchCompanyAndJobs = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('Dashboard: Sem usuário logado');
+      return;
+    }
+    
+    console.log('Dashboard: Buscando empresa para user_id:', user.id);
     
     try {
-      // Buscar empresa do usuário
-      const { data: companyData, error: companyError } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (companyError) {
-        if (companyError.code === 'PGRST116') {
-          toast({
-            title: "Empresa não encontrada",
-            description: "Complete seu cadastro criando uma nova conta.",
-            variant: "destructive",
-          });
-          navigate('/auth');
-          return;
-        }
+      setLoadingCompany(true);
+      
+      // Buscar empresa do usuário com retry
+      let companyData = null;
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      while (!companyData && attempts < maxAttempts) {
+        attempts++;
+        console.log(`Dashboard: Tentativa ${attempts} de buscar empresa...`);
         
+        const { data, error } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (error) {
+          console.error('Erro ao buscar empresa:', error);
+          if (attempts === maxAttempts) {
+            throw error;
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+          continue;
+        }
+
+        if (data && data.length > 0) {
+          companyData = data[0];
+          console.log('Dashboard: Empresa encontrada:', companyData);
+        } else if (attempts < maxAttempts) {
+          console.log('Dashboard: Empresa não encontrada, aguardando...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+
+      if (!companyData) {
+        console.log('Dashboard: Empresa não encontrada após tentativas');
+        toast({
+          title: "Empresa não encontrada",
+          description: "Parece que sua empresa ainda não foi criada. Faça logout e cadastre-se novamente.",
+          variant: "destructive",
+        });
+        setLoadingCompany(false);
         setLoadingJobs(false);
         return;
       }
 
       setCompany(companyData);
+      console.log('Dashboard: Empresa definida, buscando vagas...');
 
       // Buscar vagas da empresa
+      setLoadingJobs(true);
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select('*')
@@ -81,12 +114,24 @@ const Dashboard = () => {
 
       if (jobsError) {
         console.error('Error fetching jobs:', jobsError);
+        toast({
+          title: "Erro ao carregar vagas",
+          description: "Erro ao buscar suas vagas. Tente novamente.",
+          variant: "destructive",
+        });
       } else {
+        console.log('Dashboard: Vagas encontradas:', jobsData?.length || 0);
         setJobs(jobsData || []);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching data:', error);
+      toast({
+        title: "Erro ao carregar dados",
+        description: "Erro ao carregar informações. Tente fazer login novamente.",
+        variant: "destructive",
+      });
     } finally {
+      setLoadingCompany(false);
       setLoadingJobs(false);
     }
   };
@@ -101,6 +146,7 @@ const Dashboard = () => {
   };
 
   const handleJobSaved = () => {
+    console.log('Dashboard: Vaga salva, atualizando lista...');
     fetchCompanyAndJobs();
     setActiveTab("jobs");
     setSelectedJob(null);
@@ -135,7 +181,6 @@ const Dashboard = () => {
   };
 
   const createPaymentJob = async () => {
-    // Simular criação de job para pagamento
     return { success: true, jobId: 'temp-id' };
   };
 
@@ -148,18 +193,18 @@ const Dashboard = () => {
     fetchCompanyAndJobs();
   };
 
-  // Contar vagas que precisam de pagamento (simulação - na prática você teria um campo payment_status)
+  // Contar vagas que precisam de pagamento (simulação)
   const pendingPaymentJobs = jobs.filter(job => 
     job.status === 'Ativa' && 
     company?.email !== 'vagas@vagas.com'
   ).length;
 
-  if (loading) {
+  if (loading || loadingCompany) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando...</p>
+          <p className="text-gray-600">Carregando suas informações...</p>
         </div>
       </div>
     );
@@ -177,25 +222,17 @@ const Dashboard = () => {
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Empresa não encontrada</h2>
             <p className="text-gray-600 mb-6">
-              Não foi possível encontrar sua empresa. Faça um novo cadastro.
+              Sua empresa ainda não foi criada ou houve um erro no cadastro. 
+              Faça logout e cadastre-se novamente.
             </p>
             
             <div className="space-y-3">
               <Button 
-                onClick={() => navigate('/auth')}
-                className="w-full bg-green-600 hover:bg-green-700"
-              >
-                <Building2 className="w-4 h-4 mr-2" />
-                Fazer novo cadastro
-              </Button>
-              
-              <Button 
                 onClick={handleLogout}
-                variant="ghost"
-                className="w-full text-gray-600"
+                className="w-full bg-red-600 hover:bg-red-700"
               >
                 <LogOut className="w-4 h-4 mr-2" />
-                Sair da conta
+                Fazer Logout e Cadastrar Novamente
               </Button>
             </div>
           </CardContent>

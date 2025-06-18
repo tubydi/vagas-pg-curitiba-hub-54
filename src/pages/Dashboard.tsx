@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -21,6 +20,8 @@ import {
 } from "lucide-react";
 import EnhancedJobForm from "@/components/EnhancedJobForm";
 import CandidatesList from "@/components/CandidatesList";
+import PaymentWarning from "@/components/PaymentWarning";
+import PixPaymentModal from "@/components/PixPaymentModal";
 import type { Database } from "@/integrations/supabase/types";
 
 type Job = Database['public']['Tables']['jobs']['Row'];
@@ -34,6 +35,7 @@ const Dashboard = () => {
   const [company, setCompany] = useState<Company | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [loadingJobs, setLoadingJobs] = useState(true);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -132,6 +134,26 @@ const Dashboard = () => {
     }
   };
 
+  const createPaymentJob = async () => {
+    // Simular criação de job para pagamento
+    return { success: true, jobId: 'temp-id' };
+  };
+
+  const handlePaymentComplete = () => {
+    setShowPaymentModal(false);
+    toast({
+      title: "✅ Pagamento Confirmado!",
+      description: "Obrigado! Todas as suas vagas estão agora em dia.",
+    });
+    fetchCompanyAndJobs();
+  };
+
+  // Contar vagas que precisam de pagamento (simulação - na prática você teria um campo payment_status)
+  const pendingPaymentJobs = jobs.filter(job => 
+    job.status === 'Ativa' && 
+    company?.email !== 'vagas@vagas.com'
+  ).length;
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -209,6 +231,12 @@ const Dashboard = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8">
+        {/* Aviso de Pagamento Pendente */}
+        <PaymentWarning 
+          jobsCount={pendingPaymentJobs}
+          onOpenPayment={() => setShowPaymentModal(true)}
+        />
+
         {/* Navigation Tabs */}
         <div className="bg-white rounded-xl shadow-lg mb-8">
           <div className="flex flex-wrap border-b">
@@ -476,6 +504,17 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+
+      {/* Modal de Pagamento PIX Global */}
+      {showPaymentModal && (
+        <PixPaymentModal
+          jobTitle="Pagamento de Vagas Pendentes"
+          companyEmail={company.email}
+          onClose={() => setShowPaymentModal(false)}
+          onPaymentComplete={handlePaymentComplete}
+          createJobFn={createPaymentJob}
+        />
+      )}
     </div>
   );
 };

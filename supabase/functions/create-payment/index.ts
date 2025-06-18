@@ -196,7 +196,7 @@ serve(async (req) => {
     const mpData = await mpResponse.json()
     console.log('✅ Resposta do Mercado Pago:', JSON.stringify(mpData, null, 2))
 
-    // Salvar job com status pendente
+    // Salvar job com status pendente - CORRIGIDO: usar 'Pausada' em vez de 'Pendente'
     const { data: job, error: jobError } = await supabaseClient
       .from('jobs')
       .insert([{

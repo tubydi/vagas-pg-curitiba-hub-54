@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,15 +71,8 @@ const Auth = () => {
     setLoading(true);
     
     try {
-      const { error } = await signIn(email, password);
-      
-      if (!error) {
-        // O redirecionamento será feito automaticamente pelo AuthContext
-        toast({
-          title: "Login realizado",
-          description: "Bem-vindo!",
-        });
-      }
+      await signIn(email, password);
+      // O redirecionamento será feito automaticamente pelo AuthContext
     } catch (error) {
       console.error('Login error:', error);
     }
@@ -141,10 +133,10 @@ const Auth = () => {
         status: 'Ativa' // Definir empresa como ativa automaticamente
       };
 
-      const { error: authError } = await signUp(companyData.email, companyData.password, companyDataWithActiveStatus);
+      const result = await signUp(companyData.email, companyData.password, companyDataWithActiveStatus);
       
-      if (authError) {
-        console.error('Auth error:', authError);
+      if (result.error) {
+        console.error('Auth error:', result.error);
         setLoading(false);
         return;
       }

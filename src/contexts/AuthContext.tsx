@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,7 +57,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('is_admin')
+        .select('role')
         .eq('id', userId)
         .single();
 
@@ -64,7 +65,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error('Error fetching admin status:', error);
         setIsAdmin(false);
       } else {
-        setIsAdmin(data?.is_admin || false);
+        setIsAdmin(data?.role === 'admin');
       }
     } catch (error) {
       console.error('Error fetching admin status:', error);

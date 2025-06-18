@@ -38,6 +38,7 @@ const Dashboard = () => {
   const [loadingCompany, setLoadingCompany] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [companyError, setCompanyError] = useState<string | null>(null);
+  const [creatingCompany, setCreatingCompany] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -50,7 +51,8 @@ const Dashboard = () => {
   const createMissingCompany = async () => {
     if (!user) return false;
 
-    console.log('Dashboard: Criando empresa ausente para usuário:', user.email);
+    console.log('Dashboard: Criando empresa para usuário:', user.email);
+    setCreatingCompany(true);
     
     try {
       // Criar empresa baseada no email do usuário
@@ -58,7 +60,7 @@ const Dashboard = () => {
       
       const companyData = {
         user_id: user.id,
-        name: isAdminUser ? 'VAGAS PG - Administração' : 'Empresa Pendente',
+        name: isAdminUser ? 'VAGAS PG - Administração' : 'Empresa Criada Automaticamente',
         cnpj: isAdminUser ? '00.000.000/0000-00' : '99.999.999/9999-99',
         email: user.email,
         phone: '(42) 0000-0000',
@@ -66,8 +68,8 @@ const Dashboard = () => {
         city: 'Ponta Grossa',
         sector: 'Administração',
         legal_representative: 'Representante Legal',
-        description: isAdminUser ? 'Empresa administrativa do sistema' : 'Empresa criada automaticamente - favor atualizar dados',
-        status: isAdminUser ? 'Ativa' : 'Pendente'
+        description: isAdminUser ? 'Empresa administrativa do sistema' : 'Empresa criada automaticamente - favor atualizar dados no perfil',
+        status: 'Ativa' as const // Definir explicitamente o tipo correto
       };
 
       const { data: newCompany, error: createError } = await supabase
@@ -86,14 +88,16 @@ const Dashboard = () => {
       setCompanyError(null);
       
       toast({
-        title: "Empresa criada",
-        description: isAdminUser ? "Empresa administrativa criada." : "Empresa criada automaticamente. Atualize seus dados no perfil.",
+        title: "Empresa criada com sucesso!",
+        description: isAdminUser ? "Empresa administrativa ativada." : "Sua empresa está pronta! Você já pode publicar vagas.",
       });
 
       return true;
     } catch (error) {
       console.error('Erro ao criar empresa:', error);
       return false;
+    } finally {
+      setCreatingCompany(false);
     }
   };
 
@@ -125,9 +129,9 @@ const Dashboard = () => {
       }
 
       if (!companyData) {
-        console.log('Dashboard: Empresa não encontrada, tentando criar...');
+        console.log('Dashboard: Empresa não encontrada, criando automaticamente...');
         
-        // Tentar criar empresa automaticamente
+        // Criar empresa automaticamente
         const companyCreated = await createMissingCompany();
         
         if (!companyCreated) {
@@ -138,7 +142,6 @@ const Dashboard = () => {
         }
         
         // Se chegou até aqui, a empresa foi criada com sucesso
-        // Não precisa buscar vagas ainda pois é uma empresa nova
         setJobs([]);
         setLoadingJobs(false);
         setLoadingCompany(false);
@@ -246,12 +249,14 @@ const Dashboard = () => {
     company?.email !== 'admin@vagaspg.com'
   ).length;
 
-  if (loading || loadingCompany) {
+  if (loading || loadingCompany || creatingCompany) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando suas informações...</p>
+          <p className="text-gray-600">
+            {creatingCompany ? 'Criando sua empresa...' : 'Carregando suas informações...'}
+          </p>
         </div>
       </div>
     );

@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -110,7 +109,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string, companyData: any) => {
-    console.log('=== INICIANDO CADASTRO ===');
+    console.log('=== INICIANDO CADASTRO DIRETO ===');
     console.log('Email:', email);
     console.log('Company Data:', companyData);
     
@@ -143,10 +142,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { data: null, error };
       }
 
-      console.log('2. Usuário criado com sucesso:', authData.user.id);
+      console.log('2. Usuário criado, criando empresa para:', authData.user.id);
 
       // Aguardar para garantir que o trigger do profile foi executado
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Verificar se o profile foi criado
       console.log('3. Verificando profile...');
@@ -173,7 +172,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.log('Profile encontrado:', profileData);
       }
 
-      // Criar empresa
+      // Criar empresa automaticamente
       console.log('4. Criando empresa...');
       const { data: companyInsertData, error: companyError } = await supabase
         .from('companies')
@@ -181,14 +180,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           user_id: authData.user.id,
           name: companyData.companyName,
           cnpj: companyData.cnpj,
-          email: companyData.email || email, // Usar email do form ou do auth
+          email: companyData.email || email,
           phone: companyData.phone,
           address: companyData.address,
           city: companyData.city,
           sector: companyData.sector,
           legal_representative: companyData.legalRepresentative,
           description: companyData.description || '',
-          status: 'Ativa' // Empresa ativa automaticamente
+          status: 'Ativa' as const // Empresa ativa automaticamente
         }])
         .select()
         .single();
@@ -217,8 +216,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('5. Empresa criada com sucesso:', companyInsertData);
 
       toast({
-        title: "Cadastro realizado!",
-        description: "Sua empresa foi cadastrada e ativada automaticamente. Você já pode publicar vagas!",
+        title: "Cadastro realizado com sucesso!",
+        description: "Sua empresa está ativa e pronta para publicar vagas!",
       });
 
       return { data: authData, error: null };

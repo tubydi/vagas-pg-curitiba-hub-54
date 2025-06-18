@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Building2, 
@@ -18,63 +18,95 @@ import {
   CheckCircle,
   LogOut
 } from "lucide-react";
-import SimpleJobForm from "@/components/SimpleJobForm";
+import EnhancedJobForm from "@/components/EnhancedJobForm";
 import CandidatesList from "@/components/CandidatesList";
-import { useCompanyData } from "@/hooks/useCompanyData";
-import { supabase } from "@/integrations/supabase/client";
+import PaymentWarning from "@/components/PaymentWarning";
+import PixPaymentModal from "@/components/PixPaymentModal";
 import type { Database } from "@/integrations/supabase/types";
 
 type Job = Database['public']['Tables']['jobs']['Row'];
+type Company = Database['public']['Tables']['companies']['Row'];
 
 const Dashboard = () => {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [company, setCompany] = useState<Company | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const { toast } = useToast();
 
-  const {
-    company,
-    jobs,
-    loading: companyLoading,
-    error: companyError,
-    refreshData
-  } = useCompanyData(user?.id);
-
   useEffect(() => {
-    if (user?.email && !company && !companyLoading && !companyError) {
-      console.log('Atualizando dados para:', user.email);
-      refreshData(user.email);
+    if (user) {
+      fetchCompanyAndJobs();
     }
-  }, [user?.email, company, companyLoading, companyError, refreshData]);
+  }, [user]);
+
+  const fetchCompanyAndJobs = async () => {
+    if (!user) return;
+    
+    try {
+      // Buscar empresa do usuário
+      const { data: companyData, error: companyError } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (companyError) {
+        if (companyError.code === 'PGRST116') {
+          toast({
+            title: "Empresa não encontrada",
+            description: "Complete seu cadastro criando uma nova conta.",
+            variant: "destructive",
+          });
+          navigate('/auth');
+          return;
+        }
+        
+        setLoadingJobs(false);
+        return;
+      }
+
+      setCompany(companyData);
+
+      // Buscar vagas da empresa
+      const { data: jobsData, error: jobsError } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('company_id', companyData.id)
+        .order('created_at', { ascending: false });
+
+      if (jobsError) {
+        console.error('Error fetching jobs:', jobsError);
+      } else {
+        setJobs(jobsData || []);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoadingJobs(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
-      console.log('Iniciando logout...');
       await signOut();
-      console.log('Redirecionando para home...');
       navigate('/');
     } catch (error) {
       console.error('Erro no logout:', error);
-      toast({
-        title: "Erro no logout",
-        description: "Tente novamente",
-        variant: "destructive",
-      });
     }
   };
 
   const handleJobSaved = () => {
-    console.log('Vaga salva, atualizando dados...');
-    if (user?.email) {
-      refreshData(user.email);
-    }
+    fetchCompanyAndJobs();
     setActiveTab("jobs");
     setSelectedJob(null);
   };
 
   const handleEditJob = (job: Job) => {
-    console.log('Editando vaga:', job);
     setSelectedJob(job);
     setActiveTab("new-job");
   };
@@ -82,39 +114,47 @@ const Dashboard = () => {
   const handleDeleteJob = async (jobId: string) => {
     if (!confirm("Tem certeza que deseja excluir esta vaga?")) return;
 
-    try {
-      const { error } = await supabase
-        .from('jobs')
-        .delete()
-        .eq('id', jobId);
+    const { error } = await supabase
+      .from('jobs')
+      .delete()
+      .eq('id', jobId);
 
-      if (error) {
-        console.error('Erro ao excluir vaga:', error);
-        toast({
-          title: "Erro",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Sucesso",
-          description: "Vaga excluída!",
-        });
-        if (user?.email) {
-          refreshData(user.email);
-        }
-      }
-    } catch (error) {
-      console.error('Erro inesperado:', error);
+    if (error) {
       toast({
-        title: "Erro inesperado",
-        description: "Falha ao excluir vaga",
+        title: "Erro",
+        description: "Erro ao excluir vaga.",
         variant: "destructive",
       });
+    } else {
+      toast({
+        title: "Sucesso",
+        description: "Vaga excluída com sucesso!",
+      });
+      fetchCompanyAndJobs();
     }
   };
 
-  if (authLoading) {
+  const createPaymentJob = async () => {
+    // Simular criação de job para pagamento
+    return { success: true, jobId: 'temp-id' };
+  };
+
+  const handlePaymentComplete = () => {
+    setShowPaymentModal(false);
+    toast({
+      title: "✅ Pagamento Confirmado!",
+      description: "Obrigado! Todas as suas vagas estão agora em dia.",
+    });
+    fetchCompanyAndJobs();
+  };
+
+  // Contar vagas que precisam de pagamento (simulação - na prática você teria um campo payment_status)
+  const pendingPaymentJobs = jobs.filter(job => 
+    job.status === 'Ativa' && 
+    company?.email !== 'vagas@vagas.com'
+  ).length;
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -126,56 +166,7 @@ const Dashboard = () => {
   }
 
   if (!user) {
-    console.log('Usuário não autenticado, redirecionando...');
     return <Navigate to="/auth" replace />;
-  }
-
-  if (companyLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando dados da empresa...</p>
-          <p className="text-sm text-gray-500 mt-2">Usuário: {user.email}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (companyError) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6 text-center">
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Problema com a empresa</h2>
-            <p className="text-gray-600 mb-2">Usuário: {user.email}</p>
-            <p className="text-gray-600 mb-6 text-sm">{companyError}</p>
-            
-            <div className="space-y-3">
-              <Button 
-                onClick={() => {
-                  console.log('Tentativa manual de refresh');
-                  refreshData(user.email);
-                }}
-                className="w-full bg-green-600 hover:bg-green-700"
-              >
-                Tentar Novamente
-              </Button>
-              
-              <Button 
-                onClick={handleLogout}
-                variant="outline"
-                className="w-full"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Fazer Logout
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
   }
 
   if (!company) {
@@ -183,29 +174,28 @@ const Dashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center">
-            <Building2 className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Empresa não encontrada</h2>
-            <p className="text-gray-600 mb-2">Usuário: {user.email}</p>
-            <p className="text-gray-600 mb-6 text-sm">Criando empresa automaticamente...</p>
+            <p className="text-gray-600 mb-6">
+              Não foi possível encontrar sua empresa. Faça um novo cadastro.
+            </p>
             
             <div className="space-y-3">
               <Button 
-                onClick={() => {
-                  console.log('Criação manual de empresa');
-                  refreshData(user.email);
-                }}
+                onClick={() => navigate('/auth')}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
-                Criar Empresa
+                <Building2 className="w-4 h-4 mr-2" />
+                Fazer novo cadastro
               </Button>
               
               <Button 
                 onClick={handleLogout}
-                variant="outline"
-                className="w-full"
+                variant="ghost"
+                className="w-full text-gray-600"
               >
                 <LogOut className="w-4 h-4 mr-2" />
-                Fazer Logout
+                Sair da conta
               </Button>
             </div>
           </CardContent>
@@ -213,8 +203,6 @@ const Dashboard = () => {
       </div>
     );
   }
-
-  console.log('Dashboard renderizado - Empresa:', company.name, 'Vagas:', jobs.length);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -226,9 +214,8 @@ const Dashboard = () => {
                 <Building2 className="h-8 w-8" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">Dashboard</h1>
-                <p className="text-green-100">Empresa: {company.name}</p>
-                <p className="text-green-200 text-sm">Email: {company.email}</p>
+                <h1 className="text-3xl font-bold">Dashboard - Empresa</h1>
+                <p className="text-green-100">Painel da Empresa: {company.name}</p>
               </div>
             </div>
             <Button
@@ -244,7 +231,13 @@ const Dashboard = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Navigation */}
+        {/* Aviso de Pagamento Pendente */}
+        <PaymentWarning 
+          jobsCount={pendingPaymentJobs}
+          onOpenPayment={() => setShowPaymentModal(true)}
+        />
+
+        {/* Navigation Tabs */}
         <div className="bg-white rounded-xl shadow-lg mb-8">
           <div className="flex flex-wrap border-b">
             <button
@@ -289,12 +282,26 @@ const Dashboard = () => {
                 <span>Nova Vaga</span>
               </div>
             </button>
+            <button
+              onClick={() => setActiveTab("candidates")}
+              className={`px-6 py-4 font-medium transition-colors ${
+                activeTab === "candidates"
+                  ? "border-b-2 border-green-500 text-green-600"
+                  : "text-gray-600 hover:text-green-600"
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Users className="w-5 h-5" />
+                <span>Candidatos</span>
+              </div>
+            </button>
           </div>
         </div>
 
-        {/* Content */}
+        {/* Tab Content */}
         {activeTab === "overview" && (
           <div className="space-y-8">
+            {/* Company Statistics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -303,7 +310,9 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{jobs.length}</div>
-                  <p className="text-xs text-muted-foreground">vagas publicadas</p>
+                  <p className="text-xs text-muted-foreground">
+                    vagas publicadas
+                  </p>
                 </CardContent>
               </Card>
               
@@ -316,7 +325,9 @@ const Dashboard = () => {
                   <div className="text-2xl font-bold">
                     {jobs.filter(job => job.status === 'Ativa').length}
                   </div>
-                  <p className="text-xs text-muted-foreground">recebendo candidaturas</p>
+                  <p className="text-xs text-muted-foreground">
+                    recebendo candidaturas
+                  </p>
                 </CardContent>
               </Card>
               
@@ -331,10 +342,44 @@ const Dashboard = () => {
                       {company.status}
                     </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">conta empresarial</p>
+                  <p className="text-xs text-muted-foreground">
+                    conta empresarial
+                  </p>
                 </CardContent>
               </Card>
             </div>
+            
+            {/* Company Info */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Building2 className="w-6 h-6 text-green-600" />
+                  <span>Informações da Empresa</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">Nome</h4>
+                    <p className="text-gray-600">{company.name}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">Email</h4>
+                    <p className="text-gray-600">{company.email}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">CNPJ</h4>
+                    <p className="text-gray-600">{company.cnpj}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">Status</h4>
+                    <Badge variant={company.status === 'Ativa' ? 'default' : 'secondary'}>
+                      {company.status}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -354,7 +399,12 @@ const Dashboard = () => {
               </Button>
             </div>
 
-            {jobs.length === 0 ? (
+            {loadingJobs ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                <p className="text-gray-600 mt-2">Carregando vagas...</p>
+              </div>
+            ) : jobs.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
                   <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -362,7 +412,7 @@ const Dashboard = () => {
                     Nenhuma vaga cadastrada
                   </h3>
                   <p className="text-gray-600 mb-6">
-                    Comece criando sua primeira vaga.
+                    Comece criando sua primeira vaga para atrair candidatos qualificados.
                   </p>
                   <Button
                     onClick={() => {
@@ -410,6 +460,13 @@ const Dashboard = () => {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => setActiveTab("candidates")}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleDeleteJob(job.id)}
                             className="text-red-600 hover:text-red-700"
                           >
@@ -431,7 +488,7 @@ const Dashboard = () => {
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
               {selectedJob ? "Editar Vaga" : "Nova Vaga"}
             </h2>
-            <SimpleJobForm
+            <EnhancedJobForm
               job={selectedJob}
               onSave={handleJobSaved}
               onCancel={() => setActiveTab("jobs")}
@@ -439,7 +496,25 @@ const Dashboard = () => {
             />
           </div>
         )}
+
+        {activeTab === "candidates" && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Candidatos</h2>
+            <CandidatesList />
+          </div>
+        )}
       </div>
+
+      {/* Modal de Pagamento PIX Global */}
+      {showPaymentModal && (
+        <PixPaymentModal
+          jobTitle="Pagamento de Vagas Pendentes"
+          companyEmail={company.email}
+          onClose={() => setShowPaymentModal(false)}
+          onPaymentComplete={handlePaymentComplete}
+          createJobFn={createPaymentJob}
+        />
+      )}
     </div>
   );
 };

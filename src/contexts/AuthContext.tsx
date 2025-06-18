@@ -1,16 +1,15 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from "@/hooks/use-toast";
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
   isAdmin: boolean;
-  signIn: (email: string, password: string) => Promise<{ error?: any }>;
-  signUp: (email: string, password: string) => Promise<{ error?: any }>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, companyData: any) => Promise<any>;
   signOut: () => Promise<void>;
 }
 
@@ -19,71 +18,42 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    let mounted = true;
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        
-        if (mounted) {
-          setSession(session);
-          setUser(session?.user || null);
-          
-          if (session?.user) {
-            await checkAdminStatus(session.user.id);
-          } else {
-            setIsAdmin(false);
-          }
-          
-          setLoading(false);
-        }
-      }
-    );
+      setUser(session?.user || null);
+      setLoading(false);
 
-    const initializeAuth = async () => {
-      try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        if (mounted) {
-          setSession(initialSession);
-          setUser(initialSession?.user || null);
-          
-          if (initialSession?.user) {
-            await checkAdminStatus(initialSession.user.id);
-          }
-          
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Erro ao inicializar auth:', error);
-        if (mounted) {
-          setLoading(false);
-        }
+      if (session?.user) {
+        fetchIsAdmin(session.user.id);
       }
     };
 
-    initializeAuth();
+    checkSession();
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+      if (session?.user) {
+        fetchIsAdmin(session.user.id);
+      } else {
+        setIsAdmin(false);
+      }
+    });
   }, []);
 
-  const checkAdminStatus = async (userId: string) => {
+  const fetchIsAdmin = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -91,16 +61,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', userId)
         .single();
 
-      if (!error && data) {
-        setIsAdmin(data.role === 'admin');
+      if (error) {
+        console.error('Error fetching admin status:', error);
+        setIsAdmin(false);
+      } else {
+        setIsAdmin(data?.role === 'admin');
       }
     } catch (error) {
-      console.error('Erro ao verificar admin:', error);
+      console.error('Error fetching admin status:', error);
       setIsAdmin(false);
     }
   };
 
   const signIn = async (email: string, password: string) => {
+    setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -108,103 +82,167 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
-        console.error('Login error:', error);
         toast({
-          title: "Erro no login",
+          title: "Erro ao entrar",
           description: error.message,
           variant: "destructive",
         });
-        return { error };
+        throw error;
       }
-
       toast({
-        title: "Login realizado!",
-        description: "Bem-vindo de volta!",
+        title: "Login realizado",
+        description: "Bem-vindo!",
       });
-
-      return {};
     } catch (error) {
-      console.error('Erro inesperado no login:', error);
-      return { error };
+      console.error('Login error:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, companyData: any) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log('Iniciando cadastro para:', email);
+      
+      // Primeiro criar o usuário
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-        },
       });
 
-      if (error) {
+      if (authError) {
+        console.error('Erro na criação do usuário:', authError);
         toast({
           title: "Erro no cadastro",
-          description: error.message,
+          description: authError.message,
           variant: "destructive",
         });
-        return { error };
+        return { data: null, error: authError };
       }
+
+      if (!authData.user) {
+        const error = new Error('Usuário não foi criado');
+        toast({
+          title: "Erro no cadastro",
+          description: "Falha ao criar usuário",
+          variant: "destructive",
+        });
+        return { data: null, error };
+      }
+
+      console.log('Usuário criado, criando empresa para:', authData.user.id);
+
+      // Aguardar um pouco para garantir que o usuário foi processado
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Criar empresa com dados do formulário
+      const { data: companyInsertData, error: companyError } = await supabase
+        .from('companies')
+        .insert([{
+          user_id: authData.user.id,
+          name: companyData.companyName,
+          cnpj: companyData.cnpj,
+          email: companyData.email,
+          phone: companyData.phone,
+          address: companyData.address,
+          city: companyData.city,
+          sector: companyData.sector,
+          legal_representative: companyData.legalRepresentative,
+          description: companyData.description || '',
+          status: 'Ativa' // Empresa ativa automaticamente
+        }])
+        .select()
+        .single();
+
+      if (companyError) {
+        console.error('Erro na criação da empresa:', companyError);
+        
+        // Se for erro de CNPJ duplicado, mostrar mensagem específica
+        if (companyError.code === '23505' && companyError.message.includes('companies_cnpj_key')) {
+          toast({
+            title: "CNPJ já cadastrado",
+            description: "Este CNPJ já está cadastrado no sistema. Tente fazer login ou use outro CNPJ.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Erro ao criar empresa",
+            description: "Erro ao salvar dados da empresa. Tente novamente.",
+            variant: "destructive",
+          });
+        }
+        
+        return { data: null, error: companyError };
+      }
+
+      console.log('Empresa criada com sucesso:', companyInsertData);
 
       toast({
         title: "Cadastro realizado!",
-        description: "Verifique seu email para confirmar a conta.",
+        description: "Sua empresa foi cadastrada e ativada automaticamente. Você já pode publicar vagas!",
       });
 
-      return {};
+      return { data: authData, error: null };
     } catch (error) {
       console.error('Erro inesperado no cadastro:', error);
-      return { error };
+      toast({
+        title: "Erro no cadastro",
+        description: "Erro inesperado. Tente novamente.",
+        variant: "destructive",
+      });
+      return { data: null, error };
     }
   };
 
   const signOut = async () => {
+    setLoading(true);
     try {
-      console.log('Iniciando logout...');
-      
-      // Limpar estados locais primeiro
+      // Primeiro limpar o estado local imediatamente
       setUser(null);
-      setSession(null);
       setIsAdmin(false);
       
-      // Fazer logout no Supabase
+      // Tentar fazer logout no Supabase, mas não falhar se a sessão já foi perdida
       const { error } = await supabase.auth.signOut();
       
-      if (error) {
-        console.error('Erro no logout:', error);
+      // Se o erro for relacionado à sessão não encontrada, ignorar
+      if (error && !error.message.includes('session') && !error.message.includes('Session')) {
+        console.error('Signout error:', error);
+        toast({
+          title: "Erro ao sair",
+          description: error.message,
+          variant: "destructive",
+        });
       } else {
-        console.log('Logout realizado com sucesso');
+        // Se não há erro ou é erro de sessão, considerar logout bem-sucedido
         toast({
           title: "Logout realizado",
-          description: "Até logo!",
+          description: "Você foi desconectado com sucesso.",
         });
-        
-        // Forçar redirecionamento
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 100);
       }
     } catch (error) {
-      console.error('Erro inesperado no logout:', error);
-      // Mesmo com erro, limpar estados e redirecionar
-      setUser(null);
-      setSession(null);
-      setIsAdmin(false);
-      window.location.href = '/';
+      console.error('Signout error:', error);
+      // Mesmo com erro, mostrar mensagem de sucesso se o estado foi limpo
+      toast({
+        title: "Logout realizado",
+        description: "Você foi desconectado com sucesso.",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const value = {
-    user,
-    session,
-    loading,
-    isAdmin,
-    signIn,
-    signUp,
-    signOut,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider 
+      value={{ 
+        user, 
+        loading, 
+        isAdmin, 
+        signIn, 
+        signUp, 
+        signOut 
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };

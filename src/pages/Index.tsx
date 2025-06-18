@@ -90,9 +90,6 @@ const Index = () => {
           
         const jobsWithCompanies = jobsData.map(job => ({
           ...job,
-          has_external_application: job.has_external_application || false,
-          application_method: job.application_method || null,
-          contact_info: job.contact_info || null,
           companies: companiesData?.find(c => c.id === job.company_id) || {
             id: job.company_id,
             name: 'Empresa não encontrada',

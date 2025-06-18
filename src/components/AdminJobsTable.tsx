@@ -18,7 +18,7 @@ interface Job {
   location: string;
   contract_type: string;
   work_mode: string;
-  status: string;
+  status: 'Ativa' | 'Pausada' | 'Finalizada';
   created_at: string;
   companies: {
     name: string;
@@ -68,7 +68,7 @@ const AdminJobsTable = () => {
     }
   };
 
-  const handleStatusChange = async (jobId: string, newStatus: string) => {
+  const handleStatusChange = async (jobId: string, newStatus: 'Ativa' | 'Pausada' | 'Finalizada') => {
     try {
       const { error } = await supabase
         .from('jobs')
@@ -217,7 +217,7 @@ const AdminJobsTable = () => {
                     
                     <Select 
                       value={job.status} 
-                      onValueChange={(value) => handleStatusChange(job.id, value)}
+                      onValueChange={(value: 'Ativa' | 'Pausada' | 'Finalizada') => handleStatusChange(job.id, value)}
                     >
                       <SelectTrigger className="w-32">
                         <SelectValue />

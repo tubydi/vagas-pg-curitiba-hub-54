@@ -1,7 +1,9 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { Session, User } from '@supabase/supabase-js';
+
+import { createContext, useContext } from 'react';
+import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
+import { useAuthState } from '@/hooks/useAuthState';
 
 interface AuthContextType {
   user: User | null;
@@ -23,64 +25,10 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { user, loading, isAdmin } = useAuthState();
   const { toast } = useToast();
 
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user || null);
-        if (session?.user) {
-          await fetchIsAdmin(session.user.id);
-        }
-      } catch (error) {
-        console.error('Error checking session:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email);
-      setUser(session?.user || null);
-      
-      if (session?.user) {
-        await fetchIsAdmin(session.user.id);
-      } else {
-        setIsAdmin(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchIsAdmin = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching admin status:', error);
-        setIsAdmin(false);
-      } else {
-        setIsAdmin(data?.role === 'admin');
-      }
-    } catch (error) {
-      console.error('Error fetching admin status:', error);
-      setIsAdmin(false);
-    }
-  };
-
   const signIn = async (email: string, password: string) => {
-    setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -103,26 +51,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error('Login error:', error);
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
   const signUp = async (email: string, password: string, companyData: any) => {
-    console.log('=== INICIANDO CADASTRO DIRETO ===');
-    console.log('Email:', email);
-    console.log('Company Data:', companyData);
+    console.log('Starting signup process for:', email);
     
     try {
-      // Primeiro criar o usuário
-      console.log('1. Criando usuário...');
+      // Create user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
       });
 
       if (authError) {
-        console.error('Erro na criação do usuário:', authError);
+        console.error('Auth error:', authError);
         toast({
           title: "Erro no cadastro",
           description: authError.message,
@@ -133,7 +76,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (!authData.user) {
         const error = new Error('Usuário não foi criado');
-        console.error('Usuário não foi criado');
+        console.error('User not created');
         toast({
           title: "Erro no cadastro",
           description: "Falha ao criar usuário",
@@ -142,38 +85,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { data: null, error };
       }
 
-      console.log('2. Usuário criado, criando empresa para:', authData.user.id);
+      console.log('User created, creating company...');
 
-      // Aguardar para garantir que o trigger do profile foi executado
+      // Wait for profile creation
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Verificar se o profile foi criado
-      console.log('3. Verificando profile...');
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authData.user.id)
-        .single();
-
-      if (profileError) {
-        console.log('Profile não encontrado, criando manualmente...');
-        const { error: createProfileError } = await supabase
-          .from('profiles')
-          .insert([{
-            id: authData.user.id,
-            email: email,
-            role: 'company'
-          }]);
-
-        if (createProfileError) {
-          console.error('Erro ao criar profile:', createProfileError);
-        }
-      } else {
-        console.log('Profile encontrado:', profileData);
-      }
-
-      // Criar empresa automaticamente
-      console.log('4. Criando empresa...');
+      // Create company
       const { data: companyInsertData, error: companyError } = await supabase
         .from('companies')
         .insert([{
@@ -187,25 +104,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           sector: companyData.sector,
           legal_representative: companyData.legalRepresentative,
           description: companyData.description || '',
-          status: 'Ativa' as const // Empresa ativa automaticamente
+          status: 'Ativa' as const
         }])
         .select()
         .single();
 
       if (companyError) {
-        console.error('Erro na criação da empresa:', companyError);
+        console.error('Company creation error:', companyError);
         
-        // Se for erro de CNPJ duplicado, mostrar mensagem específica
         if (companyError.code === '23505' && companyError.message.includes('companies_cnpj_key')) {
           toast({
             title: "CNPJ já cadastrado",
-            description: "Este CNPJ já está cadastrado no sistema. Tente fazer login ou use outro CNPJ.",
+            description: "Este CNPJ já está cadastrado no sistema.",
             variant: "destructive",
           });
         } else {
           toast({
             title: "Erro ao criar empresa",
-            description: "Erro ao salvar dados da empresa. Tente novamente.",
+            description: "Erro ao salvar dados da empresa.",
             variant: "destructive",
           });
         }
@@ -213,7 +129,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { data: null, error: companyError };
       }
 
-      console.log('5. Empresa criada com sucesso:', companyInsertData);
+      console.log('Company created successfully:', companyInsertData);
 
       toast({
         title: "Cadastro realizado com sucesso!",
@@ -222,7 +138,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       return { data: authData, error: null };
     } catch (error) {
-      console.error('Erro inesperado no cadastro:', error);
+      console.error('Unexpected signup error:', error);
       toast({
         title: "Erro no cadastro",
         description: "Erro inesperado. Tente novamente.",
@@ -233,14 +149,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    setLoading(true);
     try {
-      setUser(null);
-      setIsAdmin(false);
-      
       const { error } = await supabase.auth.signOut();
       
-      if (error && !error.message.includes('session') && !error.message.includes('Session')) {
+      if (error && !error.message.includes('session')) {
         console.error('Signout error:', error);
         toast({
           title: "Erro ao sair",
@@ -259,8 +171,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         title: "Logout realizado",
         description: "Você foi desconectado com sucesso.",
       });
-    } finally {
-      setLoading(false);
     }
   };
 

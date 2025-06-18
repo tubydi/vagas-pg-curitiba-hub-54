@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,10 +39,10 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
     description: "",
     requirements: "",
     salary: "",
-    location: "",
-    contract_type: "" as ContractType,
-    work_mode: "" as WorkMode,
-    experience_level: "" as ExperienceLevel,
+    location: "Ponta Grossa",
+    contract_type: "CLT" as ContractType,
+    work_mode: "Presencial" as WorkMode,
+    experience_level: "Júnior" as ExperienceLevel,
     has_external_application: false,
     application_method: "",
     contact_info: ""
@@ -57,10 +58,10 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         description: job.description || "",
         requirements: job.requirements || "",
         salary: job.salary || "",
-        location: job.location || "",
-        contract_type: job.contract_type || "" as ContractType,
-        work_mode: job.work_mode || "" as WorkMode,
-        experience_level: job.experience_level || "" as ExperienceLevel,
+        location: job.location || "Ponta Grossa",
+        contract_type: job.contract_type || "CLT",
+        work_mode: job.work_mode || "Presencial",
+        experience_level: job.experience_level || "Júnior",
         has_external_application: job.has_external_application || false,
         application_method: job.application_method || "",
         contact_info: job.contact_info || ""
@@ -68,7 +69,6 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
       setBenefitsList(job.benefits || []);
     }
     
-    // Buscar email da empresa
     fetchCompanyEmail();
   }, [job, companyId]);
 
@@ -81,19 +81,18 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         .single();
 
       if (error) {
-        console.error('Erro ao buscar email da empresa:', error);
+        console.error('Error fetching company email:', error);
       } else if (data) {
         setCompanyEmail(data.email);
       }
     } catch (error) {
-      console.error('Erro ao buscar email da empresa:', error);
+      console.error('Error fetching company email:', error);
     }
   };
 
   const handleAIExtraction = (extractedData: any) => {
-    console.log('Dados extraídos pela IA:', extractedData);
+    console.log('AI extracted data:', extractedData);
     
-    // Preencher o formulário com os dados extraídos
     setFormData({
       title: extractedData.title || "",
       description: extractedData.description || "",
@@ -108,7 +107,6 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
       contact_info: extractedData.contact_info || ""
     });
 
-    // Preencher benefícios se existirem
     if (extractedData.benefits && Array.isArray(extractedData.benefits)) {
       setBenefitsList(extractedData.benefits);
     }
@@ -119,11 +117,11 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    console.log('=== INICIANDO CRIAÇÃO DE VAGA ===');
+    console.log('Starting job creation/update process');
     console.log('Company ID:', companyId);
     console.log('Form Data:', formData);
 
-    // Validar campos obrigatórios
+    // Validate required fields
     if (!formData.title || !formData.description || !formData.requirements || 
         !formData.salary || !formData.location || !formData.contract_type || 
         !formData.work_mode || !formData.experience_level) {
@@ -138,7 +136,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
     if (!companyId) {
       toast({
         title: "Erro",
-        description: "ID da empresa não encontrado. Tente fazer logout e login novamente.",
+        description: "ID da empresa não encontrado.",
         variant: "destructive",
       });
       return;
@@ -151,21 +149,21 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         ...formData,
         benefits: benefitsList,
         company_id: companyId,
-        status: 'Ativa' as const // Sempre ativa inicialmente - status válido do enum
+        status: 'Ativa' as const // Always active - valid enum status
       };
 
-      console.log('Dados da vaga a serem inseridos:', jobData);
+      console.log('Job data to be inserted:', jobData);
 
       if (job?.id) {
-        // Atualizar vaga existente
-        console.log('Atualizando vaga existente:', job.id);
+        // Update existing job
+        console.log('Updating existing job:', job.id);
         const { error } = await supabase
           .from('jobs')
           .update(jobData)
           .eq('id', job.id);
 
         if (error) {
-          console.error('Erro ao atualizar vaga:', error);
+          console.error('Error updating job:', error);
           throw error;
         }
 
@@ -176,8 +174,8 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         
         onSave();
       } else {
-        // Nova vaga
-        console.log('Criando nova vaga...');
+        // Create new job
+        console.log('Creating new job...');
         const { data: insertedData, error } = await supabase
           .from('jobs')
           .insert([jobData])
@@ -185,22 +183,22 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
           .single();
 
         if (error) {
-          console.error('Erro ao criar vaga:', error);
+          console.error('Error creating job:', error);
           throw error;
         }
 
-        console.log('Vaga criada com sucesso:', insertedData);
+        console.log('Job created successfully:', insertedData);
         setCreatedJobId(insertedData.id);
 
-        // Verificar se é empresa isenta
-        if (companyEmail === 'vagas@vagas.com') {
+        // Check if company is exempt from payment
+        if (companyEmail === 'vagas@vagas.com' || companyEmail === 'admin@vagaspg.com') {
           toast({
             title: "✅ Vaga Publicada Gratuitamente!",
             description: "Sua empresa está isenta de pagamento. A vaga já está ativa!",
           });
           onSave();
         } else {
-          // Mostrar modal de pagamento
+          // Show payment modal
           toast({
             title: "✅ Vaga Publicada!",
             description: "Sua vaga foi publicada! Realize o pagamento PIX para manter ativa.",
@@ -236,7 +234,6 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
   };
 
   const createJobForPayment = async () => {
-    // Job já foi criado, apenas retornar sucesso
     return { success: true, jobId: createdJobId };
   };
 
@@ -498,7 +495,6 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         </CardContent>
       </Card>
 
-      {/* Modal de Pagamento PIX */}
       {showPaymentModal && (
         <PixPaymentModal
           jobTitle={formData.title}

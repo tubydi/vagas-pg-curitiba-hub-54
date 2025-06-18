@@ -1,10 +1,10 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Building2, 
@@ -22,175 +22,47 @@ import EnhancedJobForm from "@/components/EnhancedJobForm";
 import CandidatesList from "@/components/CandidatesList";
 import PaymentWarning from "@/components/PaymentWarning";
 import PixPaymentModal from "@/components/PixPaymentModal";
+import { useCompanyData } from "@/hooks/useCompanyData";
+import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
 type Job = Database['public']['Tables']['jobs']['Row'];
-type Company = Database['public']['Tables']['companies']['Row'];
 
 const Dashboard = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [company, setCompany] = useState<Company | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [loadingJobs, setLoadingJobs] = useState(false);
-  const [loadingCompany, setLoadingCompany] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
   const { toast } = useToast();
 
-  // Só inicializa quando tem usuário e auth não está loading
+  const {
+    company,
+    jobs,
+    loading: companyLoading,
+    error: companyError,
+    refreshData
+  } = useCompanyData(user?.id);
+
   useEffect(() => {
-    if (!authLoading && user && !isInitialized) {
-      console.log('Dashboard: Inicializando para usuário:', user.email);
-      setIsInitialized(true);
-      fetchCompanyAndJobs();
-    } else if (!authLoading && !user) {
-      console.log('Dashboard: Sem usuário, redirecionando...');
+    if (user && !companyLoading && !company && !companyError) {
+      console.log('Dashboard: Triggering data refresh for user:', user.email);
+      refreshData(user.email);
     }
-  }, [user, authLoading, isInitialized]);
-
-  const createMissingCompany = async () => {
-    if (!user) return false;
-
-    console.log('Dashboard: Criando empresa para usuário:', user.email);
-    
-    try {
-      const isAdminUser = user.email === 'admin@vagaspg.com' || user.email === 'vagas@vagas.com';
-      
-      const companyData = {
-        user_id: user.id,
-        name: isAdminUser ? 'VAGAS PG - Administração' : 'Empresa Criada Automaticamente',
-        cnpj: isAdminUser ? '00.000.000/0000-00' : '99.999.999/9999-99',
-        email: user.email,
-        phone: '(42) 0000-0000',
-        address: 'Endereço a ser preenchido',
-        city: 'Ponta Grossa',
-        sector: 'Administração',
-        legal_representative: 'Representante Legal',
-        description: isAdminUser ? 'Empresa administrativa do sistema' : 'Empresa criada automaticamente - favor atualizar dados no perfil',
-        status: 'Ativa' as const
-      };
-
-      const { data: newCompany, error: createError } = await supabase
-        .from('companies')
-        .insert([companyData])
-        .select()
-        .single();
-
-      if (createError) {
-        console.error('Erro ao criar empresa:', createError);
-        return false;
-      }
-
-      console.log('Dashboard: Empresa criada com sucesso:', newCompany);
-      setCompany(newCompany);
-      
-      toast({
-        title: "Empresa criada com sucesso!",
-        description: isAdminUser ? "Empresa administrativa ativada." : "Sua empresa está pronta! Você já pode publicar vagas.",
-      });
-
-      return true;
-    } catch (error) {
-      console.error('Erro ao criar empresa:', error);
-      return false;
-    }
-  };
-
-  const fetchCompanyAndJobs = async () => {
-    if (!user) {
-      console.log('Dashboard: Sem usuário logado');
-      return;
-    }
-    
-    console.log('Dashboard: Buscando empresa para user_id:', user.id);
-    
-    try {
-      setLoadingCompany(true);
-      
-      // Buscar empresa do usuário
-      const { data: companyData, error: companyError } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (companyError) {
-        console.error('Erro ao buscar empresa:', companyError);
-        setLoadingCompany(false);
-        return;
-      }
-
-      if (!companyData) {
-        console.log('Dashboard: Empresa não encontrada, criando automaticamente...');
-        
-        const companyCreated = await createMissingCompany();
-        
-        if (!companyCreated) {
-          toast({
-            title: "Erro",
-            description: "Não foi possível criar sua empresa automaticamente.",
-            variant: "destructive",
-          });
-          setLoadingCompany(false);
-          return;
-        }
-        
-        setJobs([]);
-        setLoadingCompany(false);
-        return;
-      }
-
-      console.log('Dashboard: Empresa encontrada:', companyData);
-      setCompany(companyData);
-
-      // Buscar vagas da empresa
-      setLoadingJobs(true);
-      const { data: jobsData, error: jobsError } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('company_id', companyData.id)
-        .order('created_at', { ascending: false });
-
-      if (jobsError) {
-        console.error('Error fetching jobs:', jobsError);
-        toast({
-          title: "Erro ao carregar vagas",
-          description: "Erro ao buscar suas vagas. Tente novamente.",
-          variant: "destructive",
-        });
-        setJobs([]);
-      } else {
-        console.log('Dashboard: Vagas encontradas:', jobsData?.length || 0);
-        setJobs(jobsData || []);
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      toast({
-        title: "Erro ao carregar dados",
-        description: "Erro inesperado. Tente fazer login novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingCompany(false);
-      setLoadingJobs(false);
-    }
-  };
+  }, [user, company, companyLoading, companyError, refreshData]);
 
   const handleLogout = async () => {
     try {
       await signOut();
       navigate('/');
     } catch (error) {
-      console.error('Erro no logout:', error);
+      console.error('Logout error:', error);
     }
   };
 
   const handleJobSaved = () => {
-    console.log('Dashboard: Vaga salva, atualizando lista...');
-    fetchCompanyAndJobs();
+    console.log('Job saved, refreshing data...');
+    refreshData(user?.email);
     setActiveTab("jobs");
     setSelectedJob(null);
   };
@@ -219,7 +91,7 @@ const Dashboard = () => {
         title: "Sucesso",
         description: "Vaga excluída com sucesso!",
       });
-      fetchCompanyAndJobs();
+      refreshData(user?.email);
     }
   };
 
@@ -233,11 +105,11 @@ const Dashboard = () => {
       title: "✅ Pagamento Confirmado!",
       description: "Obrigado! Todas as suas vagas estão agora em dia.",
     });
-    fetchCompanyAndJobs();
+    refreshData(user?.email);
   };
 
-  // Mostrar loading apenas se auth estiver loading ou se está inicializando
-  if (authLoading || (user && !isInitialized)) {
+  // Show loading if auth is loading
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -248,13 +120,13 @@ const Dashboard = () => {
     );
   }
 
-  // Redirecionamento se não autenticado
-  if (!authLoading && !user) {
+  // Redirect if not authenticated
+  if (!user) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Mostrar loading se estiver carregando empresa
-  if (loadingCompany && !company) {
+  // Show loading if company data is loading
+  if (companyLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -265,8 +137,8 @@ const Dashboard = () => {
     );
   }
 
-  // Se não tem empresa e não está carregando, mostrar erro
-  if (!company && !loadingCompany) {
+  // Show error if company couldn't be loaded/created
+  if (companyError || (!company && !companyLoading)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -274,12 +146,12 @@ const Dashboard = () => {
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Problema com a empresa</h2>
             <p className="text-gray-600 mb-6">
-              Sua empresa não foi encontrada no sistema.
+              {companyError || "Sua empresa não foi encontrada no sistema."}
             </p>
             
             <div className="space-y-3">
               <Button 
-                onClick={fetchCompanyAndJobs}
+                onClick={() => refreshData(user.email)}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
                 Tentar Novamente
@@ -300,7 +172,7 @@ const Dashboard = () => {
     );
   }
 
-  // Contar vagas que precisam de pagamento (simulação)
+  // Calculate pending payment jobs
   const pendingPaymentJobs = jobs.filter(job => 
     job.status === 'Ativa' && 
     company?.email !== 'vagas@vagas.com' &&
@@ -334,7 +206,6 @@ const Dashboard = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Aviso de Pagamento Pendente */}
         <PaymentWarning 
           jobsCount={pendingPaymentJobs}
           onOpenPayment={() => setShowPaymentModal(true)}
@@ -494,12 +365,7 @@ const Dashboard = () => {
               </Button>
             </div>
 
-            {loadingJobs ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-                <p className="text-gray-600 mt-2">Carregando vagas...</p>
-              </div>
-            ) : jobs.length === 0 ? (
+            {jobs.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
                   <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -600,7 +466,6 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Modal de Pagamento PIX Global */}
       {showPaymentModal && (
         <PixPaymentModal
           jobTitle="Pagamento de Vagas Pendentes"

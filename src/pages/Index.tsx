@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Building2, MapPin, Search, Star, Clock, DollarSign, Brain, Sparkles, Us
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { formatTimeAgo } from "@/utils/timeUtils";
 import JobApplicationForm from "@/components/JobApplicationForm";
 
 interface Company {

@@ -13,6 +13,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🚀 Iniciando create-payment function')
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -24,14 +26,30 @@ serve(async (req) => {
     )
 
     const body = await req.json()
+    console.log('📦 Body recebido:', JSON.stringify(body, null, 2))
+
     const { jobData, companyId } = body
 
-    console.log('Creating payment for job:', JSON.stringify(jobData, null, 2))
-    console.log('Company ID received:', companyId)
+    if (!jobData || !companyId) {
+      console.error('❌ Dados obrigatórios faltando - jobData ou companyId')
+      return new Response(
+        JSON.stringify({ 
+          error: 'jobData and companyId are required',
+          success: false 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      )
+    }
 
-    // Validar se companyId foi fornecido e não é string vazia
-    if (!companyId || typeof companyId !== 'string' || companyId.trim() === '') {
-      console.error('Company ID is missing, empty, or invalid:', companyId)
+    console.log('🔍 Validando company ID:', companyId)
+
+    // Validar se companyId é um UUID válido
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (!companyId || typeof companyId !== 'string' || companyId.trim() === '' || !uuidRegex.test(companyId)) {
+      console.error('❌ Company ID inválido:', companyId)
       return new Response(
         JSON.stringify({ 
           error: 'Company ID is required and must be a valid UUID',
@@ -44,6 +62,8 @@ serve(async (req) => {
       )
     }
 
+    console.log('🏢 Buscando dados da empresa ID:', companyId)
+
     // Verificar se a empresa existe e buscar dados
     const { data: company, error: companyError } = await supabaseClient
       .from('companies')
@@ -52,11 +72,12 @@ serve(async (req) => {
       .single()
 
     if (companyError) {
-      console.error('Error fetching company:', companyError)
+      console.error('❌ Erro ao buscar empresa:', companyError)
       return new Response(
         JSON.stringify({ 
           error: 'Company not found',
-          success: false 
+          success: false,
+          details: companyError.message
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -65,11 +86,11 @@ serve(async (req) => {
       )
     }
 
-    console.log('Company data found:', company)
+    console.log('✅ Empresa encontrada:', JSON.stringify(company, null, 2))
 
     // Verificar se a empresa é isenta
     if (company?.email === 'vagas@vagas.com') {
-      console.log('Exempt company detected, creating job directly')
+      console.log('🆓 Empresa isenta detectada, criando vaga diretamente')
       
       // Empresa isenta - criar job diretamente
       const { data: job, error: jobError } = await supabaseClient
@@ -84,11 +105,11 @@ serve(async (req) => {
         .single()
 
       if (jobError) {
-        console.error('Error creating exempt job:', jobError)
+        console.error('❌ Erro ao criar vaga isenta:', jobError)
         throw jobError
       }
 
-      console.log('Exempt job created successfully:', job.id)
+      console.log('✅ Vaga isenta criada com sucesso:', job.id)
 
       return new Response(
         JSON.stringify({ 
@@ -106,7 +127,7 @@ serve(async (req) => {
     // Para empresas que precisam pagar
     const accessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN')
     if (!accessToken) {
-      console.error('Mercado Pago access token not configured')
+      console.error('❌ Token do Mercado Pago não configurado')
       return new Response(
         JSON.stringify({ 
           error: 'Payment system not configured',
@@ -119,7 +140,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('Creating Mercado Pago preference for company:', company.name)
+    console.log('💳 Criando preferência no Mercado Pago para:', company.name)
 
     // Criar preferência no Mercado Pago
     const preference = {
@@ -145,7 +166,7 @@ serve(async (req) => {
       statement_descriptor: 'VAGAS PG'
     }
 
-    console.log('Mercado Pago preference:', JSON.stringify(preference, null, 2))
+    console.log('📋 Preferência Mercado Pago:', JSON.stringify(preference, null, 2))
 
     const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
@@ -158,11 +179,12 @@ serve(async (req) => {
 
     if (!mpResponse.ok) {
       const errorText = await mpResponse.text()
-      console.error('Mercado Pago API error:', errorText)
+      console.error('❌ Erro na API do Mercado Pago:', errorText)
       return new Response(
         JSON.stringify({ 
           error: `Payment system error: ${mpResponse.status}`,
-          success: false 
+          success: false,
+          details: errorText
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -172,7 +194,7 @@ serve(async (req) => {
     }
 
     const mpData = await mpResponse.json()
-    console.log('Mercado Pago response success:', mpData.id)
+    console.log('✅ Resposta do Mercado Pago:', JSON.stringify(mpData, null, 2))
 
     // Salvar job com status pendente
     const { data: job, error: jobError } = await supabaseClient
@@ -187,11 +209,11 @@ serve(async (req) => {
       .single()
 
     if (jobError) {
-      console.error('Error creating job:', jobError)
+      console.error('❌ Erro ao criar vaga:', jobError)
       throw jobError
     }
 
-    console.log('Job created with pending status:', job.id)
+    console.log('✅ Vaga criada com status pendente:', job.id)
 
     // Salvar informações do pagamento
     const { data: payment, error: paymentError } = await supabaseClient
@@ -208,11 +230,11 @@ serve(async (req) => {
       .single()
 
     if (paymentError) {
-      console.error('Error creating payment record:', paymentError)
+      console.error('❌ Erro ao criar registro de pagamento:', paymentError)
       throw paymentError
     }
 
-    console.log('Payment record created:', payment.id)
+    console.log('✅ Registro de pagamento criado:', payment.id)
 
     // Atualizar job com payment_id
     const { error: updateError } = await supabaseClient
@@ -221,17 +243,23 @@ serve(async (req) => {
       .eq('id', job.id)
 
     if (updateError) {
-      console.error('Error updating job with payment_id:', updateError)
+      console.error('❌ Erro ao atualizar vaga com payment_id:', updateError)
+    } else {
+      console.log('✅ Vaga atualizada com payment_id')
     }
 
+    const result = {
+      success: true,
+      jobId: job.id,
+      paymentId: payment.id,
+      checkoutUrl: mpData.init_point,
+      preferenceId: mpData.id
+    }
+
+    console.log('🎉 Resultado final:', JSON.stringify(result, null, 2))
+
     return new Response(
-      JSON.stringify({ 
-        success: true,
-        jobId: job.id,
-        paymentId: payment.id,
-        checkoutUrl: mpData.init_point,
-        preferenceId: mpData.id
-      }),
+      JSON.stringify(result),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
@@ -239,11 +267,12 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error in create-payment function:', error)
+    console.error('💥 Erro na função create-payment:', error)
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Internal server error',
-        success: false 
+        success: false,
+        stack: error.stack
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

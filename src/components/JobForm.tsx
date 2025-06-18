@@ -1,5 +1,4 @@
 
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,10 +69,12 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
 
     // Buscar email da empresa
     const fetchCompanyEmail = async () => {
-      if (!companyId) {
+      if (!companyId || companyId.trim() === '') {
         console.error('CompanyId is missing');
         return;
       }
+      
+      console.log('Buscando email da empresa com ID:', companyId);
       
       const { data, error } = await supabase
         .from('companies')
@@ -92,7 +93,9 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
       }
     };
     
-    fetchCompanyEmail();
+    if (companyId && companyId.trim() !== '') {
+      fetchCompanyEmail();
+    }
   }, [job, companyId]);
 
   const createPayment = async () => {
@@ -101,6 +104,14 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
     if (!companyId || companyId.trim() === '') {
       throw new Error('Company ID is missing');
     }
+
+    console.log('Enviando dados para create-payment:', {
+      jobData: {
+        ...formData,
+        benefits: benefitsList
+      },
+      companyId: companyId
+    });
 
     const { data, error } = await supabase.functions.invoke('create-payment', {
       body: {
@@ -117,6 +128,7 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
       throw error;
     }
     
+    console.log('create-payment response:', data);
     return data;
   };
 

@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import EnhancedJobForm from "@/components/EnhancedJobForm";
 import CandidatesList from "@/components/CandidatesList";
-import CompanyStats from "@/components/CompanyStats";
 import type { Database } from "@/integrations/supabase/types";
 
 type Job = Database['public']['Tables']['jobs']['Row'];
@@ -37,8 +36,15 @@ const Dashboard = () => {
   const [loadingJobs, setLoadingJobs] = useState(true);
   const { toast } = useToast();
 
+  console.log('Dashboard - user:', user?.email, 'isAdmin:', false);
+  console.log('VERIFICAÇÃO FINAL - isAdmin:', false, 'user email:', user?.email);
+  console.log('RENDERIZANDO PAINEL DE EMPRESA - USUÁRIO NÃO É ADMIN');
+  console.log('Renderizando painel de EMPRESA');
+
   useEffect(() => {
     if (user) {
+      console.log('Usuário no dashboard:', user.email, 'É ADMIN?', false);
+      console.log('Usuário é empresa - buscando dados...');
       fetchCompanyAndJobs();
     }
   }, [user]);
@@ -47,6 +53,8 @@ const Dashboard = () => {
     if (!user) return;
     
     try {
+      console.log('Buscando empresa para user_id:', user.id);
+      
       // Buscar empresa do usuário
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
@@ -56,9 +64,41 @@ const Dashboard = () => {
 
       if (companyError) {
         console.error('Error fetching company:', companyError);
+        
+        // Se não encontrar empresa, criar uma empresa padrão
+        if (companyError.code === 'PGRST116') {
+          console.log('Empresa não encontrada, criando empresa padrão...');
+          
+          const { data: newCompany, error: createError } = await supabase
+            .from('companies')
+            .insert([{
+              user_id: user.id,
+              name: 'Minha Empresa',
+              cnpj: '00.000.000/0001-00',
+              email: user.email || '',
+              phone: '(42) 99999-9999',
+              address: 'Endereço da empresa',
+              city: 'Ponta Grossa',
+              sector: 'Tecnologia',
+              legal_representative: 'Representante Legal',
+              description: 'Descrição da empresa',
+              status: 'Ativa' as const
+            }])
+            .select()
+            .single();
+            
+          if (createError) {
+            console.error('Error creating company:', createError);
+            return;
+          }
+          
+          console.log('Empresa criada:', newCompany);
+          setCompany(newCompany);
+        }
         return;
       }
 
+      console.log('Empresa encontrada:', companyData);
       setCompany(companyData);
 
       // Buscar vagas da empresa
@@ -195,9 +235,9 @@ const Dashboard = () => {
         <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Empresa não encontrada</h2>
+            <h2 className="text-xl font-semibold mb-2">Configurando sua conta...</h2>
             <p className="text-gray-600 mb-4">
-              Não foi possível encontrar os dados da sua empresa.
+              Estamos preparando sua conta empresarial.
             </p>
             <Button onClick={() => window.location.reload()}>
               Tentar novamente
@@ -289,7 +329,53 @@ const Dashboard = () => {
         {/* Tab Content */}
         {activeTab === "overview" && (
           <div className="space-y-8">
-            <CompanyStats companyId={company.id} />
+            {/* Company Statistics */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total de Vagas</CardTitle>
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{jobs.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    vagas publicadas
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Vagas Ativas</CardTitle>
+                  <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {jobs.filter(job => job.status === 'Ativa').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    recebendo candidaturas
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Status da Empresa</CardTitle>
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    <Badge variant={company.status === 'Ativa' ? 'default' : 'secondary'}>
+                      {company.status}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    conta empresarial
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
             
             {/* Company Info */}
             <Card>

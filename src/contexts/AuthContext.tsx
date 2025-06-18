@@ -160,23 +160,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     setLoading(true);
     try {
+      // Primeiro limpar o estado local imediatamente
+      setUser(null);
+      setIsAdmin(false);
+      
+      // Tentar fazer logout no Supabase, mas não falhar se a sessão já foi perdida
       const { error } = await supabase.auth.signOut();
-      if (error) {
+      
+      // Se o erro for relacionado à sessão não encontrada, ignorar
+      if (error && !error.message.includes('session') && !error.message.includes('Session')) {
+        console.error('Signout error:', error);
         toast({
           title: "Erro ao sair",
           description: error.message,
           variant: "destructive",
         });
-        throw error;
+      } else {
+        // Se não há erro ou é erro de sessão, considerar logout bem-sucedido
+        toast({
+          title: "Logout realizado",
+          description: "Você foi desconectado com sucesso.",
+        });
       }
-      setUser(null);
-      setIsAdmin(false);
+    } catch (error) {
+      console.error('Signout error:', error);
+      // Mesmo com erro, mostrar mensagem de sucesso se o estado foi limpo
       toast({
         title: "Logout realizado",
         description: "Você foi desconectado com sucesso.",
       });
-    } catch (error) {
-      console.error('Signout error:', error);
     } finally {
       setLoading(false);
     }

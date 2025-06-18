@@ -1,187 +1,130 @@
+-- Remove the trigger that sets payment status automatically
+DROP TRIGGER IF EXISTS set_job_payment_status_trigger ON public.jobs;
+DROP FUNCTION IF EXISTS public.set_job_payment_status();
 
--- Verificar e criar tipos enum que estão faltando
-DO $$ BEGIN
-    CREATE TYPE user_role AS ENUM ('admin', 'company');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+-- Remove payment-related columns from jobs table
+ALTER TABLE public.jobs DROP COLUMN IF EXISTS payment_status;
+ALTER TABLE public.jobs DROP COLUMN IF EXISTS payment_id;
 
-DO $$ BEGIN
-    CREATE TYPE company_status AS ENUM ('Pendente', 'Aprovada', 'Rejeitada');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+-- Drop the payments table
+DROP TABLE IF EXISTS public.payments CASCADE;
 
-DO $$ BEGIN
-    CREATE TYPE application_status AS ENUM ('Novo', 'Visualizado', 'Contato', 'Aprovado', 'Rejeitado');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+-- Drop the payment_status enum type
+DROP TYPE IF EXISTS payment_status;
 
-DO $$ BEGIN
-    CREATE TYPE job_status AS ENUM ('Ativa', 'Pausada', 'Finalizada');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+-- Remove the function to check payment exemption
+DROP FUNCTION IF EXISTS public.is_exempt_from_payment(text);
 
-DO $$ BEGIN
-    CREATE TYPE contract_type AS ENUM ('CLT', 'PJ', 'Freelancer', 'Estágio');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+-- Revert job status default to 'Ativa' in case it was 'Pendente' due to payment logic
+ALTER TABLE public.jobs ALTER COLUMN status SET DEFAULT 'Ativa';
 
-DO $$ BEGIN
-    CREATE TYPE work_mode AS ENUM ('Presencial', 'Remoto', 'Híbrido');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+-- Optionally, update any jobs still marked as 'Pendente' (if payment was the only reason)
+-- This assumes all non-paid jobs should now be active. Adjust as needed.
+UPDATE public.jobs SET status = 'Ativa' WHERE status = 'Pendente';
 
-DO $$ BEGIN
-    CREATE TYPE experience_level AS ENUM ('Júnior', 'Pleno', 'Sênior');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
--- Criar tabelas se não existirem
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  email text NOT NULL,
-  role user_role NOT NULL DEFAULT 'company',
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  PRIMARY KEY (id)
-);
-
-CREATE TABLE IF NOT EXISTS public.companies (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  cnpj text NOT NULL,
-  email text NOT NULL,
-  phone text NOT NULL,
-  address text NOT NULL,
-  city text NOT NULL,
-  sector text NOT NULL,
-  legal_representative text NOT NULL,
-  description text,
-  status company_status NOT NULL DEFAULT 'Pendente',
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  PRIMARY KEY (id),
-  UNIQUE(cnpj)
-);
-
-CREATE TABLE IF NOT EXISTS public.jobs (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
-  title text NOT NULL,
-  description text NOT NULL,
-  requirements text NOT NULL,
-  salary text NOT NULL,
-  location text NOT NULL,
-  contract_type contract_type NOT NULL,
-  work_mode work_mode NOT NULL,
-  experience_level experience_level NOT NULL,
-  benefits text[],
-  status job_status NOT NULL DEFAULT 'Ativa',
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  PRIMARY KEY (id)
-);
-
-CREATE TABLE IF NOT EXISTS public.applications (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  job_id uuid NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  email text NOT NULL,
-  phone text NOT NULL,
-  linkedin text,
-  experience_years integer,
-  current_position text,
-  education text,
-  skills text[],
-  cover_letter text,
-  resume_url text,
-  status application_status NOT NULL DEFAULT 'Novo',
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  PRIMARY KEY (id)
-);
-
-CREATE TABLE IF NOT EXISTS public.notifications (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
-  application_id uuid NOT NULL REFERENCES public.applications(id) ON DELETE CASCADE,
-  message text NOT NULL,
-  read boolean NOT NULL DEFAULT false,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  PRIMARY KEY (id)
-);
-
--- Corrigir função handle_new_user
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+-- Re-insert some example jobs if the previous migrations were removed or if they were dependent on payment logic and got stuck.
+-- This part ensures there are jobs to display after payment removal.
+DO $$
+DECLARE
+    company_id_var uuid;
 BEGIN
-  INSERT INTO public.profiles (id, email, role)
-  VALUES (
-    NEW.id, 
-    NEW.email,
-    CASE 
-      WHEN NEW.email = 'admin@vagaspg.com' THEN 'admin'::user_role
-      ELSE 'company'::user_role
-    END
-  );
-  RETURN NEW;
-EXCEPTION WHEN OTHERS THEN
-  -- Log do erro mas não falha o cadastro
-  RAISE WARNING 'Erro ao criar profile: %', SQLERRM;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Recriar trigger
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- Corrigir função get_current_user_role
-CREATE OR REPLACE FUNCTION public.get_current_user_role()
-RETURNS TEXT AS $$
-  SELECT role::text FROM public.profiles WHERE id = auth.uid();
-$$ LANGUAGE SQL SECURITY DEFINER STABLE;
-
--- Criar bucket de resumes se não existir
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('resumes', 'resumes', true)
-ON CONFLICT (id) DO NOTHING;
-
--- Policies para storage
-DROP POLICY IF EXISTS "Anyone can upload to resumes" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can view resumes" ON storage.objects;
-
-CREATE POLICY "Public Access" ON storage.objects
-  FOR ALL USING (bucket_id = 'resumes');
-
--- Habilitar RLS nas tabelas
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.applications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-
--- Policies básicas para funcionamento
-DROP POLICY IF EXISTS "Public profiles access" ON public.profiles;
-CREATE POLICY "Public profiles access" ON public.profiles FOR ALL USING (true);
-
-DROP POLICY IF EXISTS "Public companies access" ON public.companies;
-CREATE POLICY "Public companies access" ON public.companies FOR ALL USING (true);
-
-DROP POLICY IF EXISTS "Public jobs access" ON public.jobs;
-CREATE POLICY "Public jobs access" ON public.jobs FOR ALL USING (true);
-
-DROP POLICY IF EXISTS "Public applications access" ON public.applications;
-CREATE POLICY "Public applications access" ON public.applications FOR ALL USING (true);
-
-DROP POLICY IF EXISTS "Public notifications access" ON public.notifications;
-CREATE POLICY "Public notifications access" ON public.notifications FOR ALL USING (true);
+    -- Try to get an existing company ID, or create one if none exists.
+    SELECT id INTO company_id_var FROM public.companies LIMIT 1;
+    
+    IF company_id_var IS NULL THEN
+        -- Create a sample company if no companies exist
+        INSERT INTO public.companies (
+            name, 
+            cnpj, 
+            email, 
+            phone, 
+            address, 
+            city, 
+            sector, 
+            legal_representative,
+            user_id,
+            status
+        ) VALUES (
+            'Empresa Modelo S.A.',
+            '98.765.432/0001-21',
+            'recrutamento@modelo.com',
+            '(42) 11111-2222',
+            'Avenida Principal, 456',
+            'Ponta Grossa',
+            'Manufatura',
+            'Maria Oliveira',
+            gen_random_uuid(),
+            'Ativa'
+        ) RETURNING id INTO company_id_var;
+    END IF;
+    
+    -- Insert example job 1 if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM public.jobs WHERE title = 'Engenheiro de Produção') THEN
+        INSERT INTO public.jobs (
+            title, 
+            description, 
+            requirements, 
+            salary, 
+            location, 
+            contract_type, 
+            work_mode, 
+            experience_level, 
+            status,
+            company_id,
+            benefits,
+            has_external_application,
+            application_method,
+            contact_info
+        ) VALUES (
+            'Engenheiro de Produção',
+            'Profissional para otimização de processos de fabricação e gestão de equipes.',
+            'Formação em Engenharia de Produção. Experiência em Lean Manufacturing e Seis Sigma.',
+            'R$ 6.000 - R$ 9.000',
+            'Ponta Grossa',
+            'CLT',
+            'Presencial',
+            'Sênior',
+            'Ativa',
+            company_id_var,
+            ARRAY['Vale Alimentação', 'Plano de Saúde', 'Participação nos Lucros'],
+            false,
+            NULL,
+            NULL
+        );
+    END IF;
+    
+    -- Insert example job 2 if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM public.jobs WHERE title = 'Vendedor Interno') THEN
+        INSERT INTO public.jobs (
+            title, 
+            description, 
+            requirements, 
+            salary, 
+            location, 
+            contract_type, 
+            work_mode, 
+            experience_level, 
+            status,
+            company_id,
+            benefits,
+            has_external_application,
+            application_method,
+            contact_info
+        ) VALUES (
+            'Vendedor Interno',
+            'Atendimento e prospecção de clientes por telefone e e-mail. Elaboração de propostas comerciais.',
+            'Experiência prévia em vendas. Boa comunicação e negociação. Conhecimento em CRM.',
+            'R$ 2.000 + Comissão',
+            'Curitiba',
+            'CLT',
+            'Presencial',
+            'Júnior',
+            'Ativa',
+            company_id_var,
+            ARRAY['Vale Transporte', 'Comissão sobre Vendas'],
+            true,
+            'Email',
+            'vendas@modelo.com'
+        );
+    END IF;
+END $$;

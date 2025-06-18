@@ -7,12 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { X, Sparkles, Phone, Mail, MapPin } from "lucide-react"; // Removed Loader2, CreditCard, Shield, CheckCircle
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Briefcase, X, Sparkles, Phone, Mail, MapPin } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import AIJobExtractor from "./AIJobExtractor";
-import PixPaymentModal from "./PixPaymentModal";
+// Removed PixPaymentModal import
 
 type JobStatus = Database['public']['Enums']['job_status'];
 type ContractType = Database['public']['Enums']['contract_type'];
@@ -64,8 +64,8 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
   const [newBenefit, setNewBenefit] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAIExtractor, setShowAIExtractor] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [companyEmail, setCompanyEmail] = useState("");
+  // Removed showPaymentModal state
+  // Removed companyEmail state
   const { toast } = useToast();
 
   useEffect(() => {
@@ -79,53 +79,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
     }
   }, [job, companyId]);
 
-  useEffect(() => {
-    const fetchCompanyEmail = async () => {
-      const { data: company } = await supabase
-        .from('companies')
-        .select('email')
-        .eq('id', companyId)
-        .single();
-      
-      if (company) {
-        setCompanyEmail(company.email);
-      }
-    };
-
-    fetchCompanyEmail();
-  }, [companyId]);
-
-  const createJobWithPayment = async () => {
-    const jobData = {
-      ...formData,
-      company_id: companyId,
-      status: 'Ativa' as JobStatus,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (job?.id) {
-      // Atualizar vaga existente
-      const { error } = await supabase
-        .from('jobs')
-        .update(jobData)
-        .eq('id', job.id);
-
-      if (error) throw error;
-
-      return { success: true, jobId: job.id };
-    } else {
-      // Criar nova vaga
-      const { data: newJob, error } = await supabase
-        .from('jobs')
-        .insert([jobData])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      return { success: true, jobId: newJob.id };
-    }
-  };
+  // Removed useEffect for fetching company email
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,40 +95,52 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
       return;
     }
 
-    // Se for edição de vaga existente, salvar diretamente
-    if (job?.id) {
-      setIsSubmitting(true);
-      try {
-        await createJobWithPayment();
+    setIsSubmitting(true);
+    try {
+      const jobDataToSave = {
+        ...formData,
+        company_id: companyId,
+        status: 'Ativa' as JobStatus, // Always active, no payment involved
+        updated_at: new Date().toISOString(),
+      };
+
+      if (job?.id) {
+        // Atualizar vaga existente
+        const { error } = await supabase
+          .from('jobs')
+          .update(jobDataToSave)
+          .eq('id', job.id);
+
+        if (error) throw error;
+
         toast({
           title: "✅ Sucesso!",
           description: "Vaga atualizada com sucesso!",
         });
-        onSave();
-      } catch (error) {
-        console.error('Erro ao salvar vaga:', error);
+      } else {
+        // Criar nova vaga - directly insert without payment
+        const { error } = await supabase
+          .from('jobs')
+          .insert([jobDataToSave]);
+
+        if (error) throw error;
+
         toast({
-          title: "❌ Erro",
-          description: "Erro ao salvar vaga. Tente novamente.",
-          variant: "destructive",
+          title: "✅ Vaga Publicada!",
+          description: "Sua vaga foi publicada com sucesso e está ativa!",
         });
-      } finally {
-        setIsSubmitting(false);
       }
-      return;
+      onSave();
+    } catch (error) {
+      console.error('Erro ao salvar vaga:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Erro ao salvar vaga. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Para nova vaga, mostrar modal de pagamento
-    setShowPaymentModal(true);
-  };
-
-  const handlePaymentComplete = () => {
-    setShowPaymentModal(false);
-    toast({
-      title: "✅ Vaga Publicada!",
-      description: "Sua vaga foi publicada com sucesso!",
-    });
-    onSave();
   };
 
   const addBenefit = () => {
@@ -444,7 +410,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
                 disabled={isSubmitting}
                 className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white flex-1 h-12 rounded-2xl font-semibold text-lg"
               >
-                {isSubmitting ? "Salvando..." : (job ? "Atualizar Vaga" : "Publicar Vaga - R$ 11,90")}
+                {isSubmitting ? "Salvando..." : (job ? "Atualizar Vaga" : "Publicar Vaga")}
               </Button>
               <Button 
                 type="button" 
@@ -459,16 +425,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         </CardContent>
       </Card>
 
-      {/* Modal de Pagamento PIX */}
-      {showPaymentModal && (
-        <PixPaymentModal
-          jobTitle={formData.title}
-          companyEmail={companyEmail}
-          onClose={() => setShowPaymentModal(false)}
-          onPaymentComplete={handlePaymentComplete}
-          createJobFn={createJobWithPayment}
-        />
-      )}
+      {/* Removed Payment Modal */}
     </>
   );
 };

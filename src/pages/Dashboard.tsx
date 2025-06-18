@@ -20,8 +20,8 @@ import {
 } from "lucide-react";
 import EnhancedJobForm from "@/components/EnhancedJobForm";
 import CandidatesList from "@/components/CandidatesList";
-import PaymentWarning from "@/components/PaymentWarning";
-import PixPaymentModal from "@/components/PixPaymentModal";
+// Removed PaymentWarning import
+// Removed PixPaymentModal import
 import type { Database } from "@/integrations/supabase/types";
 
 type Job = Database['public']['Tables']['jobs']['Row'];
@@ -35,7 +35,7 @@ const Dashboard = () => {
   const [company, setCompany] = useState<Company | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [loadingJobs, setLoadingJobs] = useState(true);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  // Removed showPaymentModal state
   const { toast } = useToast();
 
   useEffect(() => {
@@ -134,25 +134,10 @@ const Dashboard = () => {
     }
   };
 
-  const createPaymentJob = async () => {
-    // Simular criação de job para pagamento
-    return { success: true, jobId: 'temp-id' };
-  };
-
-  const handlePaymentComplete = () => {
-    setShowPaymentModal(false);
-    toast({
-      title: "✅ Pagamento Confirmado!",
-      description: "Obrigado! Todas as suas vagas estão agora em dia.",
-    });
-    fetchCompanyAndJobs();
-  };
-
-  // Contar vagas que precisam de pagamento (simulação - na prática você teria um campo payment_status)
-  const pendingPaymentJobs = jobs.filter(job => 
-    job.status === 'Ativa' && 
-    company?.email !== 'vagas@vagas.com'
-  ).length;
+  // Removed payment-related functions and states
+  // const createPaymentJob = async () => { ... }
+  // const handlePaymentComplete = () => { ... }
+  // const pendingPaymentJobs = jobs.filter(job => job.status === 'Ativa' && company?.email !== 'vagas@vagas.com').length;
 
   if (loading) {
     return (
@@ -231,11 +216,11 @@ const Dashboard = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Aviso de Pagamento Pendente */}
-        <PaymentWarning 
+        {/* Removed PaymentWarning component */}
+        {/* <PaymentWarning 
           jobsCount={pendingPaymentJobs}
           onOpenPayment={() => setShowPaymentModal(true)}
-        />
+        /> */}
 
         {/* Navigation Tabs */}
         <div className="bg-white rounded-xl shadow-lg mb-8">
@@ -505,8 +490,8 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Modal de Pagamento PIX Global */}
-      {showPaymentModal && (
+      {/* Removed Payment Modal */}
+      {/* {showPaymentModal && (
         <PixPaymentModal
           jobTitle="Pagamento de Vagas Pendentes"
           companyEmail={company.email}
@@ -514,7 +499,7 @@ const Dashboard = () => {
           onPaymentComplete={handlePaymentComplete}
           createJobFn={createPaymentJob}
         />
-      )}
+      )} */}
     </div>
   );
 };

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/integrations/supabase/types";
+import PaymentModal from "./PaymentModal";
 
 type ContractType = Database["public"]["Enums"]["contract_type"];
 type WorkMode = Database["public"]["Enums"]["work_mode"];
@@ -92,6 +94,15 @@ const JobForm = ({ job, onSave, onCancel, companyId }: JobFormProps) => {
 
     if (error) throw error;
     return data;
+  };
+
+  const handlePaymentComplete = (jobId: string) => {
+    setShowPaymentModal(false);
+    toast({
+      title: "✅ Vaga Publicada!",
+      description: "Sua vaga foi publicada com sucesso e estará visível em breve.",
+    });
+    onSave();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

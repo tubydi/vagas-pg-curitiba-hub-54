@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
-import { Briefcase, Building2, Phone, Mail, ExternalLink, CheckCircle, Loader2, Send, Badge } from 'lucide-react';
+import { Briefcase, Building2, Phone, Mail, ExternalLink, CheckCircle, Loader2, Send } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 type ApplicationStatus = Database['public']['Enums']['application_status'];
 
@@ -252,7 +254,6 @@ Meus dados:
 • Nome: ${formData.name}
 • Email: ${formData.email}
 • Telefone: ${formData.phone}
-• Cidade: ${formData.address}
 
 ${formData.cover_letter ? `Apresentação: ${formData.cover_letter}` : ''}
 

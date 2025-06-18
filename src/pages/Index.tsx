@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,11 +53,11 @@ const Index = () => {
     console.log('Iniciando busca automática de vagas...');
     fetchFeaturedJobs();
     
-    // Buscar vagas a cada 30 segundos automaticamente
+    // Buscar vagas a cada 2 minutos (reduzido para melhor performance)
     const interval = setInterval(() => {
       console.log('Busca automática de vagas executada');
       fetchFeaturedJobs();
-    }, 30000);
+    }, 120000); // 2 minutos
 
     return () => clearInterval(interval);
   }, []);
@@ -68,7 +67,7 @@ const Index = () => {
       console.log('Executando busca de vagas... (ACESSO PÚBLICO)');
       setLoading(true);
       
-      // Busca direta das vagas
+      // Busca otimizada - apenas 6 vagas mais recentes
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select('*')
@@ -82,17 +81,15 @@ const Index = () => {
       }
 
       console.log('Vagas em destaque encontradas:', jobsData?.length || 0);
-      console.log('Dados completos das vagas:', jobsData);
 
       if (jobsData && jobsData.length > 0) {
-        // Buscar dados das empresas separadamente
+        // Buscar dados das empresas separadamente (otimizado)
         const companyIds = [...new Set(jobsData.map(job => job.company_id))];
         const { data: companiesData } = await supabase
           .from('companies')
           .select('id, name, city, sector')
           .in('id', companyIds);
           
-        // Mapear vagas com dados das empresas
         const jobsWithCompanies = jobsData.map(job => ({
           ...job,
           has_external_application: job.has_external_application || false,
@@ -106,17 +103,9 @@ const Index = () => {
           }
         }));
         
-        console.log('Vagas configuradas no estado:', jobsWithCompanies.length);
         setFeaturedJobs(jobsWithCompanies);
       } else {
-        console.log('Nenhuma vaga encontrada no banco');
-        
-        // VERIFICAÇÃO ADICIONAL - contar total de vagas no banco
-        const { count } = await supabase
-          .from('jobs')
-          .select('*', { count: 'exact', head: true });
-          
-        console.log('Total de vagas no banco:', count);
+        setFeaturedJobs([]);
       }
       
     } catch (error) {
@@ -344,7 +333,7 @@ const Index = () => {
               Oportunidades atualizadas automaticamente
             </p>
             {loading && (
-              <p className="text-sm text-green-600 mt-2">Buscando vagas mais recentes...</p>
+              <p className="text-sm text-green-600 mt-2">Carregando vagas mais recentes...</p>
             )}
           </div>
           
@@ -392,7 +381,7 @@ const Index = () => {
                     
                     <div className="flex items-center text-sm text-gray-500 mb-2">
                       <Clock className="w-4 h-4 mr-1" />
-                      {new Date(job.created_at).toLocaleDateString('pt-BR')}
+                      Publicada há {formatTimeAgo(job.created_at)}
                     </div>
                   </CardHeader>
                   
@@ -484,8 +473,11 @@ const Index = () => {
               VAGAS PG
             </h4>
           </div>
-          <div className="text-center text-gray-400 text-sm md:text-base">
+          <div className="text-center text-gray-400 text-sm md:text-base space-y-2">
             <p>&copy; 2024 VAGAS PG. Conectando talentos em Ponta Grossa e região.</p>
+            <Link to="/terms" className="text-green-400 hover:text-green-300 underline">
+              Termos de Uso e Política de Privacidade
+            </Link>
           </div>
         </div>
       </footer>

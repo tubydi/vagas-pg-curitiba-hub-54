@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import JobApplicationForm from "./JobApplicationForm";
+import JobPagination from "./JobPagination";
+import { formatTimeAgo } from "@/utils/timeUtils";
 
 interface Company {
   id: string;
@@ -48,6 +49,8 @@ interface Job {
   contact_info?: string;
 }
 
+const JOBS_PER_PAGE = 20;
+
 const JobList = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +59,8 @@ const JobList = () => {
   const [selectedContract, setSelectedContract] = useState("all");
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isApplicationFormOpen, setIsApplicationFormOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalJobs, setTotalJobs] = useState(0);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -64,12 +69,24 @@ const JobList = () => {
       console.log('Executando busca de vagas...');
       setLoading(true);
       
-      // Primeira tentativa - busca direta das vagas com status ativo
+      // Buscar total de vagas primeiro
+      const { count } = await supabase
+        .from('jobs')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'Ativa');
+
+      setTotalJobs(count || 0);
+
+      // Buscar vagas com paginação
+      const from = (currentPage - 1) * JOBS_PER_PAGE;
+      const to = from + JOBS_PER_PAGE - 1;
+
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select('*')
         .eq('status', 'Ativa')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (jobsError) {
         console.error('Erro na busca de vagas:', jobsError);
@@ -81,13 +98,10 @@ const JobList = () => {
         return;
       }
 
-      console.log('Vagas encontradas:', jobsData?.length || 0);
-      console.log('Dados das vagas:', jobsData);
+      console.log(`Vagas encontradas: ${jobsData?.length || 0} de ${totalJobs} total`);
 
       if (jobsData && jobsData.length > 0) {
-        // Buscar dados das empresas separadamente
         const companyIds = [...new Set(jobsData.map(job => job.company_id))];
-        console.log('IDs das empresas:', companyIds);
         
         const { data: companiesData, error: companiesError } = await supabase
           .from('companies')
@@ -98,9 +112,6 @@ const JobList = () => {
           console.error('Erro ao buscar empresas:', companiesError);
         }
 
-        console.log('Empresas encontradas:', companiesData?.length || 0);
-
-        // Mapear vagas com dados das empresas
         const jobsWithCompanies = jobsData.map(job => ({
           ...job,
           has_external_application: job.has_external_application || false,
@@ -114,18 +125,9 @@ const JobList = () => {
           }
         }));
 
-        console.log('Vagas com empresas mapeadas:', jobsWithCompanies.length);
         setJobs(jobsWithCompanies);
       } else {
-        console.log('Nenhuma vaga ativa encontrada');
         setJobs([]);
-        
-        // Verificação adicional - contar total de vagas
-        const { count } = await supabase
-          .from('jobs')
-          .select('*', { count: 'exact', head: true });
-          
-        console.log('Total de vagas no banco (todas):', count);
       }
       
     } catch (error) {
@@ -141,17 +143,8 @@ const JobList = () => {
   };
 
   useEffect(() => {
-    console.log('Iniciando busca automática de vagas...');
     fetchJobs();
-    
-    // Busca automática a cada 30 segundos
-    const interval = setInterval(() => {
-      console.log('Executando busca automática periódica');
-      fetchJobs();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
+  }, [currentPage]);
 
   const handleApplyJob = (job: Job) => {
     setSelectedJob(job);
@@ -163,12 +156,12 @@ const JobList = () => {
     
     if (application_method === 'WhatsApp' && contact_info) {
       const whatsappNumber = contact_info.replace(/\D/g, '');
-      const message = encodeURIComponent(`Olá! Gostaria de me candidatar para a vaga de ${job.title} na empresa ${job.companies.name}.`);
+      const message = encodeURIComponent(`Olá! Vim através do site *Vagas PG* (https://vagaspg.vercel.app/) e gostaria de me candidatar para a vaga de *${job.title}* na empresa *${job.companies.name}*. Aguardo retorno!`);
       const whatsappUrl = `https://wa.me/55${whatsappNumber}?text=${message}`;
       window.open(whatsappUrl, '_blank');
     } else if (application_method === 'Email' && contact_info) {
-      const subject = encodeURIComponent(`Candidatura para vaga: ${job.title}`);
-      const body = encodeURIComponent(`Olá!\n\nGostaria de me candidatar para a vaga de ${job.title} na empresa ${job.companies.name}.\n\nAguardo retorno.\n\nAtenciosamente.`);
+      const subject = encodeURIComponent(`Candidatura via Vagas PG - ${job.title}`);
+      const body = encodeURIComponent(`Olá!\n\nVim através do site Vagas PG (https://vagaspg.vercel.app/) e gostaria de me candidatar para a vaga de ${job.title} na empresa ${job.companies.name}.\n\nAguardo retorno.\n\nAtenciosamente.`);
       const emailUrl = `mailto:${contact_info}?subject=${subject}&body=${body}`;
       window.open(emailUrl, '_blank');
     } else if (application_method === 'Telefone' && contact_info) {
@@ -186,6 +179,13 @@ const JobList = () => {
     setIsApplicationFormOpen(false);
     setSelectedJob(null);
   };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const totalPages = Math.ceil(totalJobs / JOBS_PER_PAGE);
 
   const filteredJobs = jobs.filter(job => {
     const matchesSearch = searchTerm === "" || 
@@ -215,7 +215,7 @@ const JobList = () => {
         <div className="max-w-6xl mx-auto">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Buscando vagas automaticamente...</p>
+            <p className="mt-4 text-gray-600">Carregando vagas...</p>
           </div>
         </div>
       </div>
@@ -231,7 +231,7 @@ const JobList = () => {
             Todas as Vagas
           </h1>
           <p className="text-lg md:text-xl text-gray-600">
-            Vagas atualizadas automaticamente - {jobs.length} disponíveis
+            {totalJobs} vagas disponíveis - Página {currentPage} de {totalPages}
           </p>
         </div>
 
@@ -280,130 +280,122 @@ const JobList = () => {
         {/* Results */}
         <div className="mb-6 text-center md:text-left">
           <p className="text-gray-600">
-            {filteredJobs.length} vaga{filteredJobs.length !== 1 ? 's' : ''} encontrada{filteredJobs.length !== 1 ? 's' : ''}
+            Mostrando {jobs.length} de {totalJobs} vagas
           </p>
         </div>
 
         {/* Jobs Grid */}
-        {filteredJobs.length === 0 ? (
+        {jobs.length === 0 ? (
           <Card className="border-0 shadow-lg rounded-3xl">
             <CardContent className="p-8 md:p-12 text-center">
               <Building2 className="h-12 md:h-16 w-12 md:w-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl md:text-2xl font-bold text-gray-700 mb-2">
-                {jobs.length === 0 ? "Sistema buscando vagas..." : "Nenhuma vaga encontrada"}
+                Nenhuma vaga encontrada
               </h3>
               <p className="text-gray-500">
-                {jobs.length === 0 
-                  ? "O sistema está executando busca automática de vagas. Aguarde alguns instantes." 
-                  : "Tente ajustar os filtros de busca ou aguarde novas vagas serem adicionadas automaticamente."
-                }
+                Tente ajustar os filtros de busca ou aguarde novas vagas serem adicionadas.
               </p>
-              {jobs.length === 0 && (
-                <Button 
-                  onClick={fetchJobs}
-                  className="mt-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl"
-                >
-                  Buscar Novamente
-                </Button>
-              )}
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filteredJobs.map((job) => (
-              <Card key={job.id} className="group hover:shadow-2xl transition-all duration-300 border-0 bg-white rounded-3xl overflow-hidden">
-                <CardHeader className="bg-gradient-to-br from-gray-50 to-green-50 pb-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg md:text-xl font-bold text-gray-900 group-hover:text-green-600 transition-colors line-clamp-2">
-                        {job.title}
-                      </CardTitle>
-                      <CardDescription className="text-green-600 font-semibold text-base md:text-lg mt-1">
-                        {job.companies.name}
-                      </CardDescription>
-                    </div>
-                    <Badge variant="outline" className="rounded-full shrink-0 text-xs">
-                      {job.experience_level}
-                    </Badge>
-                  </div>
-                  
-                  <div className="flex items-center text-sm text-gray-500 mb-2">
-                    <Clock className="w-4 h-4 mr-1" />
-                    {new Date(job.created_at).toLocaleDateString('pt-BR')}
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="p-4 md:p-6">
-                  <p className="text-gray-600 mb-6 line-clamp-3 text-sm md:text-base">{job.description}</p>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between text-gray-700">
-                      <div className="flex items-center min-w-0 flex-1">
-                        <MapPin className="w-5 h-5 mr-2 text-green-500 shrink-0" />
-                        <span className="font-medium text-sm md:text-base truncate">{job.location}</span>
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {jobs.map((job) => (
+                <Card key={job.id} className="group hover:shadow-2xl transition-all duration-300 border-0 bg-white rounded-3xl overflow-hidden">
+                  <CardHeader className="bg-gradient-to-br from-gray-50 to-green-50 pb-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg md:text-xl font-bold text-gray-900 group-hover:text-green-600 transition-colors line-clamp-2">
+                          {job.title}
+                        </CardTitle>
+                        <CardDescription className="text-green-600 font-semibold text-base md:text-lg mt-1">
+                          {job.companies.name}
+                        </CardDescription>
                       </div>
-                      <Badge variant="outline" className="rounded-full ml-2 text-xs">
-                        {job.work_mode}
+                      <Badge variant="outline" className="rounded-full shrink-0 text-xs">
+                        {job.experience_level}
                       </Badge>
                     </div>
                     
-                    <div className="flex items-center justify-between text-gray-700">
-                      <div className="flex items-center min-w-0 flex-1">
-                        <DollarSign className="w-5 h-5 mr-2 text-green-500 shrink-0" />
-                        <span className="font-bold text-base md:text-lg text-green-600 truncate">{job.salary}</span>
-                      </div>
-                      <Badge variant="outline" className="rounded-full ml-2 text-xs">
-                        {job.contract_type}
-                      </Badge>
+                    <div className="flex items-center text-sm text-gray-500 mb-2">
+                      <Clock className="w-4 h-4 mr-1" />
+                      Publicada há {formatTimeAgo(job.created_at)}
                     </div>
-
-                    {job.benefits && job.benefits.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {job.benefits.slice(0, 2).map((benefit, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {benefit}
-                          </Badge>
-                        ))}
-                        {job.benefits.length > 2 && (
-                          <Badge variant="secondary" className="text-xs">
-                            +{job.benefits.length - 2} benefícios
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  </CardHeader>
                   
-                  {/* Botões de Candidatura */}
-                  <div className="mt-6 space-y-3">
-                    {/* Candidatura pelo site (sempre disponível) */}
-                    <Button 
-                      onClick={() => handleApplyJob(job)}
-                      className="w-full h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-semibold text-base md:text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
-                    >
-                      Candidatar-se pelo Site
-                    </Button>
+                  <CardContent className="p-4 md:p-6">
+                    <p className="text-gray-600 mb-6 line-clamp-3 text-sm md:text-base">{job.description}</p>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between text-gray-700">
+                        <div className="flex items-center min-w-0 flex-1">
+                          <MapPin className="w-5 h-5 mr-2 text-green-500 shrink-0" />
+                          <span className="font-medium text-sm md:text-base truncate">{job.location}</span>
+                        </div>
+                        <Badge variant="outline" className="rounded-full ml-2 text-xs">
+                          {job.work_mode}
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-gray-700">
+                        <div className="flex items-center min-w-0 flex-1">
+                          <DollarSign className="w-5 h-5 mr-2 text-green-500 shrink-0" />
+                          <span className="font-bold text-base md:text-lg text-green-600 truncate">{job.salary}</span>
+                        </div>
+                        <Badge variant="outline" className="rounded-full ml-2 text-xs">
+                          {job.contract_type}
+                        </Badge>
+                      </div>
 
-                    {/* Candidatura direta (se disponível) */}
-                    {job.has_external_application && job.application_method && job.contact_info && (
+                      {job.benefits && job.benefits.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {job.benefits.slice(0, 2).map((benefit, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {benefit}
+                            </Badge>
+                          ))}
+                          {job.benefits.length > 2 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{job.benefits.length - 2} benefícios
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Botões de Candidatura */}
+                    <div className="mt-6 space-y-3">
+                      {/* Candidatura pelo site (sempre disponível) */}
                       <Button 
-                        onClick={() => handleDirectApplication(job)}
-                        variant="outline"
-                        className="w-full h-12 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 rounded-2xl font-semibold text-base md:text-lg transition-all duration-200"
+                        onClick={() => handleApplyJob(job)}
+                        className="w-full h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-semibold text-base md:text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
                       >
-                        {job.application_method === 'WhatsApp' && 'WhatsApp: '}
-                        {job.application_method === 'Email' && 'Email: '}
-                        {job.application_method === 'Telefone' && 'Telefone: '}
-                        {job.application_method === 'Presencial' && 'Presencial: '}
-                        {job.application_method === 'Site' && 'Site: '}
-                        {job.application_method === 'Outro' && 'Outro: '}
-                        Candidatar-se via {job.application_method}
+                        Candidatar-se pelo Site
                       </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+
+                      {/* Candidatura direta (se disponível) */}
+                      {job.has_external_application && job.application_method && job.contact_info && (
+                        <Button 
+                          onClick={() => handleDirectApplication(job)}
+                          variant="outline"
+                          className="w-full h-12 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 rounded-2xl font-semibold text-base md:text-lg transition-all duration-200"
+                        >
+                          Candidatar-se via {job.application_method}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Paginação */}
+            <JobPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          </>
         )}
 
         {/* Application Form Modal */}

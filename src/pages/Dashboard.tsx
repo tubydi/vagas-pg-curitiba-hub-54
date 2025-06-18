@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -106,6 +105,12 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [latestJobs, setLatestJobs] = useState<string>("");
   const [loadingLatestJobs, setLoadingLatestJobs] = useState(false);
+  const [currentJobsPage, setCurrentJobsPage] = useState(1);
+  const [currentApplicationsPage, setCurrentApplicationsPage] = useState(1);
+  const [totalCompanyJobs, setTotalCompanyJobs] = useState(0);
+  const [totalApplications, setTotalApplications] = useState(0);
+
+  const ITEMS_PER_PAGE = 10;
 
   console.log('Dashboard - user:', user?.email, 'isAdmin:', isAdmin);
 

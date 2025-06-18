@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import VpgIAPage from "./pages/VpgIA";
 import Jobs from "./pages/Jobs";
+import TermsOfUse from "./pages/TermsOfUse";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/jobs" element={<Jobs />} />
+            <Route path="/terms" element={<TermsOfUse />} />
             <Route path="/auth" element={<Auth />} />
             <Route 
               path="/dashboard" 

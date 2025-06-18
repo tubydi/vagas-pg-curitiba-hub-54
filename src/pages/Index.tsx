@@ -43,80 +43,61 @@ const Index = () => {
 
   const fetchFeaturedJobs = async () => {
     try {
-      console.log('Executando busca melhorada de vagas... (ACESSO PÚBLICO)');
+      console.log('Executando busca de vagas...');
       setLoading(true);
       
-      const { data, error } = await supabase
+      // Primeira tentativa: buscar vagas ativas
+      const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
-        .select(`
-          *,
-          companies!inner (
-            id,
-            name,
-            city,
-            sector
-          )
-        `)
+        .select('*')
         .eq('status', 'Ativa')
         .order('created_at', { ascending: false })
         .limit(6);
 
-      if (error) {
-        console.error('Erro na busca principal:', error);
-        
-        const { data: jobsData, error: jobsError } = await supabase
-          .from('jobs')
-          .select('*')
-          .eq('status', 'Ativa')
-          .order('created_at', { ascending: false })
-          .limit(6);
-
-        if (jobsError) {
-          console.error('Erro na busca alternativa:', jobsError);
-          return;
-        }
-
-        if (jobsData && jobsData.length > 0) {
-          const companyIds = [...new Set(jobsData.map(job => job.company_id))];
-          const { data: companiesData } = await supabase
-            .from('companies')
-            .select('id, name, city, sector')
-            .in('id', companyIds);
-
-          const jobsWithCompanies = jobsData.map(job => ({
-            ...job,
-            has_external_application: job.has_external_application || false,
-            application_method: job.application_method || null,
-            contact_info: job.contact_info || null,
-            companies: companiesData?.find(c => c.id === job.company_id) || {
-              id: job.company_id,
-              name: 'Empresa não encontrada',
-              city: 'N/A',
-              sector: 'N/A'
-            }
-          }));
-
-          console.log('Busca alternativa funcionou:', jobsWithCompanies.length, 'vagas');
-          setFeaturedJobs(jobsWithCompanies);
-        }
+      if (jobsError) {
+        console.error('Erro ao buscar vagas:', jobsError);
         return;
       }
 
-      console.log('Vagas em destaque encontradas:', data?.length || 0, 'vagas');
-      console.log('Dados completos das vagas:', data);
-      
-      if (data && data.length > 0) {
-        const mappedJobs = data.map(job => ({
+      console.log('Vagas encontradas:', jobsData?.length || 0);
+      console.log('Dados das vagas:', jobsData);
+
+      if (jobsData && jobsData.length > 0) {
+        // Buscar dados das empresas para as vagas encontradas
+        const companyIds = [...new Set(jobsData.map(job => job.company_id))];
+        console.log('IDs das empresas:', companyIds);
+        
+        const { data: companiesData, error: companiesError } = await supabase
+          .from('companies')
+          .select('id, name, city, sector')
+          .in('id', companyIds);
+
+        if (companiesError) {
+          console.error('Erro ao buscar empresas:', companiesError);
+        }
+
+        console.log('Empresas encontradas:', companiesData?.length || 0);
+
+        // Combinar dados das vagas com dados das empresas
+        const jobsWithCompanies = jobsData.map(job => ({
           ...job,
           has_external_application: job.has_external_application || false,
           application_method: job.application_method || null,
-          contact_info: job.contact_info || null
+          contact_info: job.contact_info || null,
+          companies: companiesData?.find(c => c.id === job.company_id) || {
+            id: job.company_id,
+            name: 'Empresa não encontrada',
+            city: 'N/A',
+            sector: 'N/A'
+          }
         }));
-        
-        setFeaturedJobs(mappedJobs);
+
+        console.log('Vagas com empresas configuradas:', jobsWithCompanies.length);
+        setFeaturedJobs(jobsWithCompanies);
       } else {
-        console.log('Nenhuma vaga encontrada no banco');
+        console.log('Nenhuma vaga ativa encontrada');
         
+        // Verificar total de vagas no banco
         const { count } = await supabase
           .from('jobs')
           .select('*', { count: 'exact', head: true });
@@ -132,11 +113,11 @@ const Index = () => {
   };
 
   useEffect(() => {
-    console.log('Busca automática de vagas executada');
+    console.log('Iniciando busca de vagas na página inicial');
     fetchFeaturedJobs();
     
     const interval = setInterval(() => {
-      console.log('Busca automática periódica executada');
+      console.log('Atualizando vagas automaticamente');
       fetchFeaturedJobs();
     }, 30000);
 
@@ -269,9 +250,9 @@ const Index = () => {
                 <p className="text-gray-500 mb-6">
                   Estamos trabalhando com empresas locais para trazer as melhores oportunidades para você.
                 </p>
-                <p className="text-sm text-gray-400">
-                  Total de vagas no sistema: carregando...
-                </p>
+                <Button onClick={fetchFeaturedJobs} className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl">
+                  Atualizar Vagas
+                </Button>
               </CardContent>
             </Card>
           ) : (

@@ -61,87 +61,65 @@ const JobList = () => {
 
   const fetchJobs = async () => {
     try {
-      console.log('Executando busca automática de vagas...');
+      console.log('Executando busca de todas as vagas...');
       setLoading(true);
       
-      const { data, error } = await supabase
+      // Buscar todas as vagas ativas
+      const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
-        .select(`
-          *,
-          companies!inner (
-            id,
-            name,
-            city,
-            sector,
-            email,
-            phone
-          )
-        `)
+        .select('*')
         .eq('status', 'Ativa')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Erro na busca principal:', error);
-        
-        console.log('Executando busca alternativa...');
-        const { data: jobsData, error: jobsError } = await supabase
-          .from('jobs')
-          .select('*')
-          .eq('status', 'Ativa')
-          .order('created_at', { ascending: false });
-
-        if (jobsError) {
-          console.error('Erro na busca alternativa:', jobsError);
-          toast({
-            title: "Erro ao carregar vagas",
-            description: "Não foi possível carregar as vagas. Tente novamente.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        if (jobsData && jobsData.length > 0) {
-          const companyIds = [...new Set(jobsData.map(job => job.company_id))];
-          const { data: companiesData } = await supabase
-            .from('companies')
-            .select('id, name, city, sector, email, phone')
-            .in('id', companyIds);
-
-          const jobsWithCompanies = jobsData.map(job => ({
-            ...job,
-            has_external_application: job.has_external_application || false,
-            application_method: job.application_method || null,
-            contact_info: job.contact_info || null,
-            companies: companiesData?.find(c => c.id === job.company_id) || {
-              id: job.company_id,
-              name: 'Empresa não encontrada',
-              city: 'N/A',
-              sector: 'N/A'
-            }
-          }));
-
-          console.log('Busca alternativa funcionou:', jobsWithCompanies.length, 'vagas');
-          setJobs(jobsWithCompanies);
-        }
+      if (jobsError) {
+        console.error('Erro ao buscar vagas:', jobsError);
+        toast({
+          title: "Erro ao carregar vagas",
+          description: "Não foi possível carregar as vagas. Tente novamente.",
+          variant: "destructive",
+        });
         return;
       }
 
-      console.log('Vagas encontradas:', data?.length || 0, 'vagas');
-      console.log('Dados das vagas:', data);
-      
-      if (data && data.length > 0) {
-        const mappedJobs = data.map(job => ({
+      console.log('Vagas encontradas:', jobsData?.length || 0);
+      console.log('Dados das vagas:', jobsData);
+
+      if (jobsData && jobsData.length > 0) {
+        // Buscar dados das empresas
+        const companyIds = [...new Set(jobsData.map(job => job.company_id))];
+        console.log('IDs das empresas:', companyIds);
+        
+        const { data: companiesData, error: companiesError } = await supabase
+          .from('companies')
+          .select('id, name, city, sector, email, phone')
+          .in('id', companyIds);
+
+        if (companiesError) {
+          console.error('Erro ao buscar empresas:', companiesError);
+        }
+
+        console.log('Empresas encontradas:', companiesData?.length || 0);
+
+        // Combinar dados
+        const jobsWithCompanies = jobsData.map(job => ({
           ...job,
           has_external_application: job.has_external_application || false,
           application_method: job.application_method || null,
-          contact_info: job.contact_info || null
+          contact_info: job.contact_info || null,
+          companies: companiesData?.find(c => c.id === job.company_id) || {
+            id: job.company_id,
+            name: 'Empresa não encontrada',
+            city: 'N/A',
+            sector: 'N/A'
+          }
         }));
-        
-        setJobs(mappedJobs);
-        console.log('Total de vagas configuradas:', mappedJobs.length);
+
+        console.log('Vagas com empresas configuradas:', jobsWithCompanies.length);
+        setJobs(jobsWithCompanies);
       } else {
         console.log('Nenhuma vaga ativa encontrada');
         
+        // Verificar total de vagas
         const { count } = await supabase
           .from('jobs')
           .select('*', { count: 'exact', head: true });
@@ -162,7 +140,7 @@ const JobList = () => {
   };
 
   useEffect(() => {
-    console.log('Iniciando busca automática de vagas...');
+    console.log('Iniciando busca de vagas...');
     fetchJobs();
     
     const interval = setInterval(() => {
@@ -235,7 +213,7 @@ const JobList = () => {
         <div className="max-w-6xl mx-auto">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Buscando vagas automaticamente...</p>
+            <p className="mt-4 text-gray-600">Buscando vagas...</p>
           </div>
         </div>
       </div>
@@ -250,7 +228,7 @@ const JobList = () => {
             Todas as Vagas
           </h1>
           <p className="text-lg md:text-xl text-gray-600">
-            Vagas atualizadas automaticamente - {jobs.length} disponíveis
+            {jobs.length} vagas disponíveis
           </p>
         </div>
 
@@ -306,18 +284,18 @@ const JobList = () => {
             <CardContent className="p-8 md:p-12 text-center">
               <Building2 className="h-12 md:h-16 w-12 md:w-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl md:text-2xl font-bold text-gray-700 mb-2">
-                {jobs.length === 0 ? "Sistema buscando vagas..." : "Nenhuma vaga encontrada"}
+                {jobs.length === 0 ? "Buscando vagas..." : "Nenhuma vaga encontrada"}
               </h3>
-              <p className="text-gray-500">
+              <p className="text-gray-500 mb-6">
                 {jobs.length === 0 
-                  ? "O sistema está executando busca automática de vagas. Aguarde alguns instantes." 
-                  : "Tente ajustar os filtros de busca ou aguarde novas vagas serem adicionadas automaticamente."
+                  ? "O sistema está buscando vagas. Aguarde alguns instantes." 
+                  : "Tente ajustar os filtros de busca ou aguarde novas vagas serem adicionadas."
                 }
               </p>
               {jobs.length === 0 && (
                 <Button 
                   onClick={fetchJobs}
-                  className="mt-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl"
+                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl"
                 >
                   <Search className="w-4 h-4 mr-2" />
                   Buscar Novamente

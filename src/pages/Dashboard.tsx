@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -15,12 +16,14 @@ import {
   Trash2,
   AlertCircle,
   CheckCircle,
-  LogOut
+  LogOut,
+  Bug
 } from "lucide-react";
 import EnhancedJobForm from "@/components/EnhancedJobForm";
 import CandidatesList from "@/components/CandidatesList";
 import PaymentWarning from "@/components/PaymentWarning";
 import PixPaymentModal from "@/components/PixPaymentModal";
+import DatabaseTestComponent from "@/components/DatabaseTestComponent";
 import { useCompanyData } from "@/hooks/useCompanyData";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
@@ -33,6 +36,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showDatabaseTest, setShowDatabaseTest] = useState(false);
   const { toast } = useToast();
 
   const {
@@ -46,7 +50,7 @@ const Dashboard = () => {
   // Auto-refresh when user changes and no company is loaded
   useEffect(() => {
     if (user?.email && !company && !companyLoading && !companyError) {
-      console.log('Dashboard: User loaded but no company, triggering refresh');
+      console.log('📊 Dashboard: Triggering data refresh for user:', user.email);
       refreshData(user.email);
     }
   }, [user?.email, company, companyLoading, companyError, refreshData]);
@@ -61,7 +65,7 @@ const Dashboard = () => {
   };
 
   const handleJobSaved = () => {
-    console.log('Job saved, refreshing dashboard data...');
+    console.log('✅ Job saved, refreshing dashboard data...');
     if (user?.email) {
       refreshData(user.email);
     }
@@ -70,7 +74,7 @@ const Dashboard = () => {
   };
 
   const handleEditJob = (job: Job) => {
-    console.log('Editing job:', job);
+    console.log('✏️ Editing job:', job);
     setSelectedJob(job);
     setActiveTab("new-job");
   };
@@ -85,7 +89,7 @@ const Dashboard = () => {
         .eq('id', jobId);
 
       if (error) {
-        console.error('Error deleting job:', error);
+        console.error('❌ Error deleting job:', error);
         toast({
           title: "❌ Erro",
           description: `Erro ao excluir vaga: ${error.message}`,
@@ -101,7 +105,7 @@ const Dashboard = () => {
         }
       }
     } catch (error) {
-      console.error('Unexpected error deleting job:', error);
+      console.error('❌ Unexpected error deleting job:', error);
       toast({
         title: "❌ Erro inesperado",
         description: "Falha ao excluir vaga",
@@ -139,7 +143,7 @@ const Dashboard = () => {
 
   // Redirect if not authenticated
   if (!user) {
-    console.log('No user found, redirecting to auth');
+    console.log('❌ No user found, redirecting to auth');
     return <Navigate to="/auth" replace />;
   }
 
@@ -170,12 +174,21 @@ const Dashboard = () => {
             <div className="space-y-3">
               <Button 
                 onClick={() => {
-                  console.log('Manual refresh triggered by user');
+                  console.log('🔄 Manual refresh triggered by user');
                   refreshData(user.email);
                 }}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
                 Tentar Novamente
+              </Button>
+              
+              <Button 
+                onClick={() => setShowDatabaseTest(true)}
+                variant="outline"
+                className="w-full"
+              >
+                <Bug className="w-4 h-4 mr-2" />
+                Testar Banco de Dados
               </Button>
               
               <Button 
@@ -207,12 +220,21 @@ const Dashboard = () => {
             <div className="space-y-3">
               <Button 
                 onClick={() => {
-                  console.log('Manual company creation triggered');
+                  console.log('🏢 Manual company creation triggered');
                   refreshData(user.email);
                 }}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
                 Criar Empresa
+              </Button>
+              
+              <Button 
+                onClick={() => setShowDatabaseTest(true)}
+                variant="outline"
+                className="w-full"
+              >
+                <Bug className="w-4 h-4 mr-2" />
+                Testar Banco de Dados
               </Button>
               
               <Button 
@@ -230,6 +252,24 @@ const Dashboard = () => {
     );
   }
 
+  // Show database test if requested
+  if (showDatabaseTest) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-4xl">
+          <Button 
+            onClick={() => setShowDatabaseTest(false)}
+            className="mb-4"
+            variant="outline"
+          >
+            ← Voltar ao Dashboard
+          </Button>
+          <DatabaseTestComponent />
+        </div>
+      </div>
+    );
+  }
+
   // Calculate pending payment jobs
   const pendingPaymentJobs = jobs.filter(job => 
     job.status === 'Ativa' && 
@@ -237,7 +277,7 @@ const Dashboard = () => {
     company?.email !== 'admin@vagaspg.com'
   ).length;
 
-  console.log('Dashboard render - Company:', company.name, 'Jobs:', jobs.length);
+  console.log('✅ Dashboard render - Company:', company.name, 'Jobs:', jobs.length);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -254,14 +294,24 @@ const Dashboard = () => {
                 <p className="text-green-200 text-sm">Email: {company.email}</p>
               </div>
             </div>
-            <Button
-              onClick={handleLogout}
-              variant="ghost"
-              className="text-white hover:bg-white/20 rounded-xl"
-            >
-              <LogOut className="w-5 h-5 mr-2" />
-              Sair
-            </Button>
+            <div className="flex space-x-2">
+              <Button
+                onClick={() => setShowDatabaseTest(true)}
+                variant="ghost"
+                className="text-white hover:bg-white/20 rounded-xl"
+              >
+                <Bug className="w-5 h-5 mr-2" />
+                Debug
+              </Button>
+              <Button
+                onClick={handleLogout}
+                variant="ghost"
+                className="text-white hover:bg-white/20 rounded-xl"
+              >
+                <LogOut className="w-5 h-5 mr-2" />
+                Sair
+              </Button>
+            </div>
           </div>
         </div>
       </div>

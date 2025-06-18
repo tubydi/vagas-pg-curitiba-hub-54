@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +75,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
 
   const fetchCompanyEmail = async () => {
     try {
+      console.log('🔍 Fetching company email for companyId:', companyId);
       const { data, error } = await supabase
         .from('companies')
         .select('email')
@@ -81,13 +83,18 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         .single();
 
       if (error) {
-        console.error('Error fetching company email:', error);
+        console.error('❌ Error fetching company email:', error);
+        toast({
+          title: "❌ Erro",
+          description: `Erro ao buscar dados da empresa: ${error.message}`,
+          variant: "destructive",
+        });
       } else if (data) {
         setCompanyEmail(data.email);
-        console.log('Company email loaded:', data.email);
+        console.log('✅ Company email loaded:', data.email);
       }
     } catch (error) {
-      console.error('Error fetching company email:', error);
+      console.error('❌ Unexpected error fetching company email:', error);
     }
   };
 
@@ -137,15 +144,14 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    console.log('=== STARTING JOB SUBMISSION ===');
-    console.log('Company ID:', companyId);
-    console.log('Company Email:', companyEmail);
-    console.log('Form Data:', formData);
+    console.log('🚀 Starting job creation/update process');
+    console.log('🏢 Company ID:', companyId);
+    console.log('📝 Form Data:', formData);
 
     // Validate form
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
-      console.error('Validation errors:', validationErrors);
+      console.error('❌ Validation errors:', validationErrors);
       toast({
         title: "❌ Erro de Validação",
         description: validationErrors.join(", "),
@@ -155,7 +161,7 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
     }
 
     if (!companyId) {
-      console.error('No company ID provided');
+      console.error('❌ No company ID provided');
       toast({
         title: "❌ Erro",
         description: "ID da empresa não encontrado.",
@@ -168,18 +174,28 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
     
     try {
       const jobData = {
-        ...formData,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        requirements: formData.requirements.trim(),
+        salary: formData.salary.trim(),
+        location: formData.location,
+        contract_type: formData.contract_type,
+        work_mode: formData.work_mode,
+        experience_level: formData.experience_level,
+        has_external_application: formData.has_external_application,
+        application_method: formData.application_method?.trim() || null,
+        contact_info: formData.contact_info?.trim() || null,
         benefits: benefitsList,
         company_id: companyId,
-        status: 'Ativa' as const // Always use 'Ativa' status
+        status: 'Ativa' as const
       };
 
-      console.log('=== JOB DATA TO BE SAVED ===');
-      console.log(jobData);
+      console.log('📊 Job data to be inserted:', jobData);
 
       if (job?.id) {
         // Update existing job
-        console.log('=== UPDATING EXISTING JOB ===', job.id);
+        console.log('✏️ Updating existing job with ID:', job.id);
+        
         const { data: updatedJob, error } = await supabase
           .from('jobs')
           .update(jobData)
@@ -187,12 +203,14 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
           .select()
           .single();
 
+        console.log('📤 Update response:', { data: updatedJob, error });
+
         if (error) {
-          console.error('Error updating job:', error);
+          console.error('❌ Error updating job:', error);
           throw new Error(`Erro ao atualizar vaga: ${error.message}`);
         }
 
-        console.log('Job updated successfully:', updatedJob);
+        console.log('✅ Job updated successfully:', updatedJob);
         toast({
           title: "✅ Vaga atualizada!",
           description: "A vaga foi atualizada com sucesso!",
@@ -201,37 +219,66 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         onSave();
       } else {
         // Create new job
-        console.log('=== CREATING NEW JOB ===');
+        console.log('🆕 Creating new job...');
+        
         const { data: insertedData, error } = await supabase
           .from('jobs')
           .insert([jobData])
           .select()
           .single();
 
+        console.log('📤 Insert response:', { data: insertedData, error });
+
         if (error) {
-          console.error('Error creating job:', error);
-          throw new Error(`Erro ao criar vaga: ${error.message}`);
+          console.error('❌ Error creating job:', error);
+          console.error('❌ Error details:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
+          
+          let errorMessage = `Erro ao criar vaga: ${error.message}`;
+          if (error.details) {
+            errorMessage += ` - ${error.details}`;
+          }
+          if (error.hint) {
+            errorMessage += ` - ${error.hint}`;
+          }
+          
+          toast({
+            title: "❌ Erro ao criar vaga",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          return;
         }
 
         if (!insertedData) {
-          throw new Error('Vaga criada mas dados não retornados');
+          console.error('❌ Job created but no data returned');
+          toast({
+            title: "❌ Erro",
+            description: "Vaga criada mas dados não retornados",
+            variant: "destructive",
+          });
+          return;
         }
 
-        console.log('Job created successfully:', insertedData);
+        console.log('✅ Job created successfully:', insertedData);
         setCreatedJobId(insertedData.id);
 
         // Check if company is exempt from payment
         const isExemptCompany = companyEmail === 'vagas@vagas.com' || companyEmail === 'admin@vagaspg.com';
         
         if (isExemptCompany) {
-          console.log('Company is exempt from payment');
+          console.log('💰 Company is exempt from payment');
           toast({
             title: "✅ Vaga Publicada Gratuitamente!",
             description: "Sua empresa está isenta de pagamento. A vaga já está ativa!",
           });
           onSave();
         } else {
-          console.log('Company requires payment, showing payment modal');
+          console.log('💳 Company requires payment, showing payment modal');
           toast({
             title: "✅ Vaga Publicada!",
             description: "Sua vaga foi publicada! Realize o pagamento PIX para manter ativa.",
@@ -240,22 +287,23 @@ const EnhancedJobForm = ({ job, onSave, onCancel, companyId }: EnhancedJobFormPr
         }
       }
     } catch (error: any) {
-      console.error('=== ERROR SAVING JOB ===');
-      console.error('Error details:', error);
+      console.error('💥 CRITICAL ERROR in job creation/update:');
+      console.error('Error object:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error stack:', error?.stack);
       
-      let errorMessage = "Erro desconhecido ao salvar vaga";
-      if (error.message) {
+      let errorMessage = "Erro crítico ao salvar vaga";
+      if (error?.message) {
         errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
       }
       
       toast({
-        title: "❌ Erro ao salvar vaga",
+        title: "❌ Erro crítico",
         description: errorMessage,
         variant: "destructive",
       });
     } finally {
+      console.log('🏁 Job creation/update process finished');
       setLoading(false);
     }
   };

@@ -16,30 +16,31 @@ export const useCompanyData = (userId: string | undefined) => {
 
   const createMissingCompany = async (userEmail: string) => {
     if (!userId) {
-      console.error('No userId provided for company creation');
+      console.error('❌ No userId provided for company creation');
       return false;
     }
 
-    console.log('Creating company for user:', userEmail, 'with userId:', userId);
+    console.log('🏢 Creating company for user:', userEmail, 'with userId:', userId);
     
     try {
       const isAdminUser = userEmail === 'admin@vagaspg.com' || userEmail === 'vagas@vagas.com';
       
+      // NEVER generate fake CNPJ - use real format but clear placeholder
       const companyData = {
         user_id: userId,
-        name: isAdminUser ? 'VAGAS PG - Administração' : 'Empresa Criada Automaticamente',
-        cnpj: isAdminUser ? '00.000.000/0000-00' : `99.${Math.floor(Math.random() * 1000)}.${Math.floor(Math.random() * 1000)}/0001-${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`,
+        name: isAdminUser ? 'VAGAS PG - Administração' : 'Empresa - Complete os Dados',
+        cnpj: '00.000.000/0000-00', // Placeholder - user must update
         email: userEmail,
         phone: '(42) 0000-0000',
         address: 'Endereço a ser preenchido',
         city: 'Ponta Grossa',
         sector: 'Administração',
         legal_representative: 'Representante Legal',
-        description: isAdminUser ? 'Empresa administrativa do sistema' : 'Empresa criada automaticamente',
+        description: isAdminUser ? 'Empresa administrativa do sistema' : 'Complete os dados da sua empresa',
         status: 'Ativa' as const
       };
 
-      console.log('Inserting company data:', companyData);
+      console.log('📊 Inserting company data:', companyData);
 
       const { data: newCompany, error: createError } = await supabase
         .from('companies')
@@ -48,9 +49,9 @@ export const useCompanyData = (userId: string | undefined) => {
         .single();
 
       if (createError) {
-        console.error('Error creating company:', createError);
+        console.error('❌ Error creating company:', createError);
         toast({
-          title: "Erro ao criar empresa",
+          title: "❌ Erro ao criar empresa",
           description: `Falha na criação: ${createError.message}`,
           variant: "destructive",
         });
@@ -58,28 +59,35 @@ export const useCompanyData = (userId: string | undefined) => {
       }
 
       if (!newCompany) {
-        console.error('Company created but no data returned');
+        console.error('❌ Company created but no data returned');
         toast({
-          title: "Erro ao criar empresa",
+          title: "❌ Erro ao criar empresa",
           description: "Dados da empresa não foram retornados",
           variant: "destructive",
         });
         return false;
       }
 
-      console.log('Company created successfully:', newCompany);
+      console.log('✅ Company created successfully:', newCompany);
       setCompany(newCompany);
       
-      toast({
-        title: "✅ Empresa criada com sucesso!",
-        description: "Sua empresa está pronta para publicar vagas!",
-      });
+      if (isAdminUser) {
+        toast({
+          title: "✅ Empresa administrativa criada!",
+          description: "Empresa administrativa configurada com sucesso.",
+        });
+      } else {
+        toast({
+          title: "🏢 Empresa criada!",
+          description: "Complete os dados da sua empresa no perfil.",
+        });
+      }
 
       return true;
     } catch (error) {
-      console.error('Unexpected error creating company:', error);
+      console.error('💥 Unexpected error creating company:', error);
       toast({
-        title: "Erro inesperado",
+        title: "❌ Erro inesperado",
         description: "Falha ao criar empresa. Tente novamente.",
         variant: "destructive",
       });
@@ -89,7 +97,7 @@ export const useCompanyData = (userId: string | undefined) => {
 
   const fetchCompanyAndJobs = async (userEmail?: string) => {
     if (!userId) {
-      console.log('No userId provided, skipping fetch');
+      console.log('⚠️ No userId provided, skipping fetch');
       return;
     }
     
@@ -97,7 +105,7 @@ export const useCompanyData = (userId: string | undefined) => {
     setError(null);
     
     try {
-      console.log('Fetching company for user_id:', userId);
+      console.log('🔍 Fetching company for user_id:', userId);
       
       // Fetch company
       const { data: companyData, error: companyError } = await supabase
@@ -107,10 +115,10 @@ export const useCompanyData = (userId: string | undefined) => {
         .maybeSingle();
 
       if (companyError) {
-        console.error('Error fetching company:', companyError);
+        console.error('❌ Error fetching company:', companyError);
         setError('Erro ao buscar empresa');
         toast({
-          title: "Erro",
+          title: "❌ Erro",
           description: `Erro ao buscar empresa: ${companyError.message}`,
           variant: "destructive",
         });
@@ -118,7 +126,7 @@ export const useCompanyData = (userId: string | undefined) => {
       }
 
       if (!companyData && userEmail) {
-        console.log('Company not found, creating automatically...');
+        console.log('🏢 Company not found, creating automatically...');
         const created = await createMissingCompany(userEmail);
         if (!created) {
           setError('Não foi possível criar sua empresa');
@@ -127,10 +135,11 @@ export const useCompanyData = (userId: string | undefined) => {
       }
 
       if (companyData) {
-        console.log('Company found:', companyData);
+        console.log('✅ Company found:', companyData);
         setCompany(companyData);
 
         // Fetch jobs
+        console.log('📋 Fetching jobs for company:', companyData.id);
         const { data: jobsData, error: jobsError } = await supabase
           .from('jobs')
           .select('*')
@@ -138,26 +147,26 @@ export const useCompanyData = (userId: string | undefined) => {
           .order('created_at', { ascending: false });
 
         if (jobsError) {
-          console.error('Error fetching jobs:', jobsError);
+          console.error('❌ Error fetching jobs:', jobsError);
           toast({
-            title: "Aviso",
+            title: "⚠️ Aviso",
             description: "Erro ao carregar vagas, mas empresa carregada com sucesso",
             variant: "destructive",
           });
           setJobs([]);
         } else {
-          console.log('Jobs found:', jobsData?.length || 0);
+          console.log('✅ Jobs found:', jobsData?.length || 0);
           setJobs(jobsData || []);
         }
       } else {
-        console.log('No company data and no email provided');
+        console.log('⚠️ No company data and no email provided');
         setError('Empresa não encontrada');
       }
     } catch (error) {
-      console.error('Unexpected error fetching data:', error);
+      console.error('💥 Unexpected error fetching data:', error);
       setError('Erro inesperado ao carregar dados');
       toast({
-        title: "Erro inesperado",
+        title: "❌ Erro inesperado",
         description: "Falha ao carregar dados. Tente novamente.",
         variant: "destructive",
       });
@@ -167,14 +176,14 @@ export const useCompanyData = (userId: string | undefined) => {
   };
 
   const refreshData = (userEmail?: string) => {
-    console.log('Refreshing data for user:', userEmail);
+    console.log('🔄 Refreshing data for user:', userEmail);
     fetchCompanyAndJobs(userEmail);
   };
 
   // Auto-fetch on userId change
   useEffect(() => {
     if (userId) {
-      console.log('UserId changed, auto-fetching company data');
+      console.log('🔄 UserId changed, auto-fetching company data');
       fetchCompanyAndJobs();
     }
   }, [userId]);
